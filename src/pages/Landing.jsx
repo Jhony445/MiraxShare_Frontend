@@ -35,7 +35,7 @@ function Landing() {
               {t('landing.ctaJoin')}
             </Link>
           </div>
-          <div className="rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3">
+          <div className="hidden rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3">
             <a
               href={WINDOWS_DOWNLOAD_URL}
               download="MiraxShare-Setup.exe"
