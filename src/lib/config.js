@@ -3,4 +3,4 @@ export const WS_URL =
 
 export const WINDOWS_DOWNLOAD_URL =
   import.meta.env.VITE_WINDOWS_DOWNLOAD_URL ||
-  'https://github.com/Jhony445/MiraxShare_Frontend/releases/latest/download/MiraxShare-Setup.exe';
+  '/downloads/MiraxShare-Setup.exe';

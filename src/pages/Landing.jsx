@@ -38,8 +38,7 @@ function Landing() {
           <div className="rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3">
             <a
               href={WINDOWS_DOWNLOAD_URL}
-              target="_blank"
-              rel="noreferrer"
+              download="MiraxShare-Setup.exe"
               className="inline-flex items-center justify-center rounded-full bg-mint-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-mint-700"
             >
               {t('landing.ctaWindows')}
