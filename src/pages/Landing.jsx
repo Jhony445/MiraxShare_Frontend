@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout.jsx';
 import { useI18n } from '../lib/i18n.jsx';
+import { WINDOWS_DOWNLOAD_URL } from '../lib/config.js';
 
 function Landing() {
   const { t } = useI18n();
@@ -33,6 +34,17 @@ function Landing() {
             >
               {t('landing.ctaJoin')}
             </Link>
+          </div>
+          <div className="rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3">
+            <a
+              href={WINDOWS_DOWNLOAD_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center rounded-full bg-mint-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-mint-700"
+            >
+              {t('landing.ctaWindows')}
+            </a>
+            <div className="mt-2 text-xs text-slate-600">{t('landing.ctaWindowsHint')}</div>
           </div>
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 px-4 py-3 text-xs text-slate-500">
             {t('landing.browserNote')}

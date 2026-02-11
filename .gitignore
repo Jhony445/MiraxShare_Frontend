@@ -4,12 +4,19 @@ node_modules/
 # Build output
 dist/
 .vite/
+release/
+native/system-audio-addon/build/
+electron/native/*.node
+electron/native/system_audio.current.json
+native/system-audio-addon/.build-native-temp.cmd
+artifacts/
 
 # Environment variables
 .env
 .env.local
 .env.development
 .env.production
+.env.example
 
 # Logs
 npm-debug.log*

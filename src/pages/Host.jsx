@@ -3,13 +3,21 @@ import Layout from '../components/Layout.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LogPanel from '../components/LogPanel.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
-import { createPeerConnection, attachStream, closePeerConnection, applyAudioBitrate } from '../lib/webrtc.js';
+import {
+  createPeerConnection,
+  closePeerConnection,
+  applyHighQualityAudioSender,
+  optimizeOpusSdpForMusic,
+  findSenderByKind,
+  upsertTrackSender,
+} from '../lib/webrtc.js';
 import { QUALITY_OPTIONS, QUALITY_PRESETS, applySenderQuality } from '../lib/qualityPresets.js';
 import { clearLog, logEvent } from '../lib/logger.js';
 import { WS_URL } from '../lib/config.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useUsername } from '../lib/userProfile.js';
 import UsernameModal from '../components/UsernameModal.jsx';
+import { createElectronSystemAudioTrack } from '../lib/systemAudioElectron.js';
 
 function createRoomId() {
   const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -21,8 +29,12 @@ function createRoomId() {
 }
 
 const MAX_VIEWERS = 6;
+const SYSTEM_AUDIO_BITRATE_KBPS = 256;
+const SYSTEM_AUDIO_MAX_AVERAGE_BITRATE = 256000;
 
 function Host() {
+  const isElectronRuntime =
+    typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron);
   const [roomId] = useState(() => createRoomId());
   const [wsStatus, setWsStatus] = useState('connecting');
   const [peerId, setPeerId] = useState(null);
@@ -34,12 +46,21 @@ function Host() {
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [members, setMembers] = useState([]);
+  const [captureSources, setCaptureSources] = useState([]);
+  const [selectedSourceId, setSelectedSourceId] = useState('');
+  const [isLoadingSources, setIsLoadingSources] = useState(false);
   const { t } = useI18n();
   const tRef = useRef(t);
   const { username, needsPrompt, persistUsername } = useUsername();
 
   const clientRef = useRef(null);
   const streamRef = useRef(null);
+  const systemAudioControllerRef = useRef(null);
+  const systemAudioStatsRef = useRef({
+    lastLogAt: 0,
+    lastDroppedChunks: 0,
+    lastUnderrunFrames: 0,
+  });
   const peersRef = useRef(new Map());
   const membersRef = useRef(new Map());
   const qualityRef = useRef(quality);
@@ -53,6 +74,11 @@ function Host() {
   useEffect(() => {
     tRef.current = t;
   }, [t]);
+
+  useEffect(() => {
+    if (!isElectronRuntime) return;
+    loadCaptureSources();
+  }, [isElectronRuntime]);
 
   useEffect(() => {
     if (!peerId || !username || joined) return;
@@ -276,31 +302,28 @@ function Host() {
 
   async function attachStreamToPeerConnection(entry, stream) {
     const pc = entry.pc;
-    if (!pc) return;
+    if (!pc || !stream) return;
 
-    const hasVideoSender = pc
-      .getSenders()
-      .some((sender) => sender.track && sender.track.kind === 'video');
+    const videoTrack = stream.getVideoTracks()[0] || null;
+    const audioTrack = stream.getAudioTracks()[0] || null;
 
-    if (hasVideoSender) return;
-
-    attachStream(pc, stream);
-
-    entry.videoSender = pc
-      .getSenders()
-      .find((sender) => sender.track && sender.track.kind === 'video') || null;
-
-    if (entry.videoSender) {
-      await applySenderQuality(entry.videoSender, QUALITY_PRESETS[qualityRef.current]);
+    if (videoTrack) {
+      entry.videoSender = await upsertTrackSender(pc, stream, videoTrack);
+      if (entry.videoSender) {
+        await applySenderQuality(entry.videoSender, QUALITY_PRESETS[qualityRef.current]);
+      }
+    } else {
+      entry.videoSender = findSenderByKind(pc, 'video');
     }
 
-    entry.audioSender = pc
-      .getSenders()
-      .find((sender) => sender.track && sender.track.kind === 'audio') || null;
-
-    if (entry.audioSender) {
-      await applyAudioBitrate(entry.audioSender, 192);
-      logEvent(tRef.current('log.audioEnabled'));
+    if (audioTrack) {
+      entry.audioSender = await upsertTrackSender(pc, stream, audioTrack);
+      if (entry.audioSender) {
+        await applyHighQualityAudioSender(entry.audioSender, SYSTEM_AUDIO_BITRATE_KBPS);
+        logEvent(tRef.current('log.audioEnabled'));
+      }
+    } else {
+      entry.audioSender = findSenderByKind(pc, 'audio');
     }
   }
 
@@ -328,7 +351,8 @@ function Host() {
     if (!client) return;
 
     const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+    const optimizedSdp = optimizeOpusSdpForMusic(offer.sdp, SYSTEM_AUDIO_MAX_AVERAGE_BITRATE);
+    await pc.setLocalDescription({ type: offer.type, sdp: optimizedSdp });
     client.signal(targetPeerId, { kind: 'offer', payload: pc.localDescription });
     logEvent(tRef.current('log.signal'), tRef.current('log.offerSent'));
   }
@@ -361,12 +385,195 @@ function Host() {
     }
   }
 
+  async function loadCaptureSources() {
+    if (!isElectronRuntime) return [];
+
+    setIsLoadingSources(true);
+    try {
+      const sources = await window.electronAPI.getSources();
+      const orderedSources = [...sources].sort((a, b) => {
+        if (a.kind !== b.kind) {
+          return a.kind === 'screen' ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+      setCaptureSources(orderedSources);
+      setSelectedSourceId((previous) => {
+        if (orderedSources.some((source) => source.id === previous)) {
+          return previous;
+        }
+        return orderedSources[0]?.id || '';
+      });
+      return orderedSources;
+    } catch (_err) {
+      setError(tRef.current('host.errorSourceLoad'));
+      return [];
+    } finally {
+      setIsLoadingSources(false);
+    }
+  }
+
+  async function stopSystemAudioCapture() {
+    const controller = systemAudioControllerRef.current;
+    systemAudioControllerRef.current = null;
+    systemAudioStatsRef.current = {
+      lastLogAt: 0,
+      lastDroppedChunks: 0,
+      lastUnderrunFrames: 0,
+    };
+    if (!controller) return;
+
+    try {
+      await controller.stop();
+      logEvent(tRef.current('log.systemAudio'), tRef.current('log.systemAudioStopped'));
+    } catch (_err) {
+      // Ignore cleanup errors.
+    }
+  }
+
+  async function createElectronSharedStream(sourceId) {
+    const videoStream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        mandatory: {
+          chromeMediaSource: 'desktop',
+          chromeMediaSourceId: sourceId,
+        },
+      },
+    });
+
+    let controller;
+    try {
+      controller = await createElectronSystemAudioTrack({
+        targetSampleRate: 48000,
+        channels: 2,
+        frameMs: 20,
+        maxQueueMs: 500,
+        onStats: ({ capture, worklet }) => {
+          const droppedChunks = Number(capture?.droppedChunks || 0);
+          const underrunFrames = Number(worklet?.framesUnderrun || 0);
+          const now = Date.now();
+
+          const shouldLog =
+            droppedChunks > systemAudioStatsRef.current.lastDroppedChunks ||
+            underrunFrames > systemAudioStatsRef.current.lastUnderrunFrames ||
+            now - systemAudioStatsRef.current.lastLogAt >= 15000;
+
+          if (!shouldLog) return;
+
+          systemAudioStatsRef.current = {
+            lastLogAt: now,
+            lastDroppedChunks: droppedChunks,
+            lastUnderrunFrames: underrunFrames,
+          };
+
+          const queueMs = Number(worklet?.queueMs || 0);
+          const emittedChunks = Number(capture?.emittedChunks || 0);
+          logEvent(
+            tRef.current('log.systemAudio'),
+            `queue=${queueMs}ms dropped=${droppedChunks} underrun=${underrunFrames} chunks=${emittedChunks}`
+          );
+        },
+      });
+    } catch (err) {
+      videoStream.getTracks().forEach((track) => track.stop());
+      throw err;
+    }
+
+    const sharedStream = new MediaStream();
+    const videoTrack = videoStream.getVideoTracks()[0];
+    if (videoTrack) {
+      sharedStream.addTrack(videoTrack);
+    }
+
+    const audioTrack = controller.track;
+    if (!audioTrack) {
+      await controller.stop();
+      videoStream.getTracks().forEach((track) => track.stop());
+      throw new Error('No system audio track available from native loopback.');
+    }
+
+    sharedStream.addTrack(audioTrack);
+    systemAudioControllerRef.current = controller;
+    logEvent(tRef.current('log.systemAudio'), tRef.current('log.systemAudioStarted'));
+    return sharedStream;
+  }
+
+  async function activateSharedStream(stream, { tuneAudio = true } = {}) {
+    streamRef.current = stream;
+    setIsSharing(true);
+    logEvent(tRef.current('log.screen'), tRef.current('log.captureStarted'));
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+    }
+
+    const videoTrack = stream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.onended = () => {
+        stopShare();
+      };
+    }
+
+    const audioTrack = stream.getAudioTracks()[0];
+    if (audioTrack && tuneAudio) {
+      if ('contentHint' in audioTrack) {
+        audioTrack.contentHint = 'music';
+      }
+      try {
+        await audioTrack.applyConstraints({
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+          sampleRate: 48000,
+        });
+      } catch (_err) {
+        // Ignore unsupported audio constraints.
+      }
+    }
+
+    await applyCaptureConstraints(QUALITY_PRESETS[qualityRef.current]);
+
+    const peers = Array.from(peersRef.current.entries());
+    if (peers.length === 0) {
+      logEvent(tRef.current('log.status'), tRef.current('log.waitingViewer'));
+      return;
+    }
+
+    for (const [peerId, entry] of peers) {
+      await ensurePeerConnection(peerId, { autoOffer: false });
+      if (entry.pc) {
+        await attachStreamToPeerConnection(entry, stream);
+        await createAndSendOffer(peerId, entry.pc);
+      }
+    }
+  }
+
   async function startShare() {
     if (isSharing) return;
     setError('');
     if (!username) return;
 
+    if (isElectronRuntime) {
+      await stopSystemAudioCapture();
+    }
+
     try {
+      if (isElectronRuntime) {
+        const sources = captureSources.length > 0 ? captureSources : await loadCaptureSources();
+        const sourceId = selectedSourceId || sources[0]?.id;
+        if (!sourceId) {
+          setError(tRef.current('host.errorSourceRequired'));
+          return;
+        }
+
+        const stream = await createElectronSharedStream(sourceId);
+        await activateSharedStream(stream, { tuneAudio: false });
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: {
@@ -378,56 +585,16 @@ function Host() {
         },
       });
 
-      streamRef.current = stream;
-      setIsSharing(true);
-      logEvent(tRef.current('log.screen'), tRef.current('log.captureStarted'));
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
-
-      const videoTrack = stream.getVideoTracks()[0];
-      if (videoTrack) {
-        videoTrack.onended = () => {
-          stopShare();
-        };
-      }
-
-      const audioTrack = stream.getAudioTracks()[0];
-      if (audioTrack) {
-        if ('contentHint' in audioTrack) {
-          audioTrack.contentHint = 'music';
-        }
-        try {
-          await audioTrack.applyConstraints({
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false,
-            channelCount: 2,
-            sampleRate: 48000,
-          });
-        } catch (_err) {
-          // Ignore unsupported audio constraints.
-        }
-      }
-
-      await applyCaptureConstraints(QUALITY_PRESETS[qualityRef.current]);
-
-      const peers = Array.from(peersRef.current.entries());
-      if (peers.length === 0) {
-        logEvent(tRef.current('log.status'), tRef.current('log.waitingViewer'));
-        return;
-      }
-
-      for (const [peerId, entry] of peers) {
-        await ensurePeerConnection(peerId, { autoOffer: false });
-        if (entry.pc) {
-          await attachStreamToPeerConnection(entry, stream);
-          await createAndSendOffer(peerId, entry.pc);
-        }
-      }
+      await activateSharedStream(stream, { tuneAudio: true });
     } catch (err) {
-      setError(t('host.errorShare'));
+      if (isElectronRuntime) {
+        cleanupStream();
+        const detail = err?.message ? ` (${err.message})` : '';
+        setError(`${tRef.current('host.errorSystemAudio')}${detail}`);
+        logEvent(tRef.current('log.systemAudio'), tRef.current('log.systemAudioFailed'));
+      } else {
+        setError(t('host.errorShare'));
+      }
       logEvent(tRef.current('log.error'), tRef.current('log.screenShareFailed'));
     }
   }
@@ -440,6 +607,7 @@ function Host() {
   }
 
   function cleanupStream() {
+    void stopSystemAudioCapture();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -582,12 +750,48 @@ function Host() {
                 ))}
               </select>
             </div>
-            <div className="mt-3 text-xs text-slate-500">
-              {t('host.audioTip')}
-            </div>
-            <div className="mt-1 text-xs text-slate-500">
-              {t('host.audioBestTip')}
-            </div>
+
+            {isElectronRuntime && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs font-semibold text-slate-600">{t('host.captureSourceLabel')}</label>
+                  <button
+                    type="button"
+                    onClick={loadCaptureSources}
+                    disabled={isLoadingSources}
+                    className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isLoadingSources ? t('host.captureSourceLoading') : t('host.captureRefresh')}
+                  </button>
+                </div>
+                <select
+                  value={selectedSourceId}
+                  onChange={(event) => setSelectedSourceId(event.target.value)}
+                  disabled={isLoadingSources || captureSources.length === 0}
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {captureSources.length === 0 ? (
+                    <option value="">{t('host.captureSourceEmpty')}</option>
+                  ) : (
+                    captureSources.map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {source.kind === 'screen' ? 'Screen' : 'Window'} - {source.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+                <div className="mt-1 text-xs text-slate-500">{t('host.captureSourceHint')}</div>
+              </div>
+            )}
+
+            {isElectronRuntime ? (
+              <div className="mt-3 text-xs text-slate-500">{t('host.electronAudioEnabled')}</div>
+            ) : (
+              <>
+                <div className="mt-3 text-xs text-slate-500">{t('host.audioTip')}</div>
+                <div className="mt-1 text-xs text-slate-500">{t('host.audioBestTip')}</div>
+              </>
+            )}
           </div>
 
           <LogPanel title={t('host.logTitle')} />

@@ -192,6 +192,11 @@ function Join() {
         if (videoRef.current && stream) {
           videoRef.current.srcObject = stream;
           videoRef.current.volume = Math.min(1, Math.max(0, volume / 100));
+          videoRef.current
+            .play()
+            .catch(() => {
+              // Autoplay can still be blocked by Chromium policy in some environments.
+            });
         }
       },
       onConnectionStateChange: (state) => {
