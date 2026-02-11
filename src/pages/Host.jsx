@@ -299,7 +299,7 @@ function Host() {
       .find((sender) => sender.track && sender.track.kind === 'audio') || null;
 
     if (entry.audioSender) {
-      await applyAudioBitrate(entry.audioSender, 384);
+      await applyAudioBitrate(entry.audioSender, 192);
       logEvent(tRef.current('log.audioEnabled'));
     }
   }
@@ -369,7 +369,13 @@ function Host() {
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
-        audio: true,
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+          sampleRate: 48000,
+        },
       });
 
       streamRef.current = stream;
@@ -540,11 +546,11 @@ function Host() {
           <div className="mx-card px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-              <div className="text-sm font-semibold text-slate-800">{t('host.screenShareTitle')}</div>
-              <div className="text-xs text-slate-500">
-                {peerId ? t('host.hostRole', { peerId }) : t('host.hostRoleWaiting')}
+                <div className="text-sm font-semibold text-slate-800">{t('host.screenShareTitle')}</div>
+                <div className="text-xs text-slate-500">
+                  {peerId ? t('host.hostRole', { peerId }) : t('host.hostRoleWaiting')}
+                </div>
               </div>
-            </div>
               <div className="flex gap-2">
                 <button
                   type="button"
