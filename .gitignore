@@ -10,6 +10,7 @@ electron/native/*.node
 electron/native/system_audio.current.json
 native/system-audio-addon/.build-native-temp.cmd
 artifacts/
+public/downloads/*.exe
 
 # Environment variables
 .env

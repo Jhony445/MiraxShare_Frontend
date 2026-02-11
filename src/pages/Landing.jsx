@@ -5,6 +5,8 @@ import { WINDOWS_DOWNLOAD_URL } from '../lib/config.js';
 
 function Landing() {
   const { t } = useI18n();
+  const isElectronRuntime =
+    typeof window !== 'undefined' && Boolean(window.electronAPI?.isElectron);
 
   return (
     <Layout>
@@ -35,16 +37,18 @@ function Landing() {
               {t('landing.ctaJoin')}
             </Link>
           </div>
-          <div className="hidden rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3">
-            <a
-              href={WINDOWS_DOWNLOAD_URL}
-              download="MiraxShare-Setup.exe"
-              className="inline-flex items-center justify-center rounded-full bg-mint-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-mint-700"
-            >
-              {t('landing.ctaWindows')}
-            </a>
-            <div className="mt-2 text-xs text-slate-600">{t('landing.ctaWindowsHint')}</div>
-          </div>
+          {!isElectronRuntime && (
+            <div className="rounded-2xl border border-brand-100 bg-brand-50/70 px-4 py-3">
+              <a
+                href={WINDOWS_DOWNLOAD_URL}
+                download="MiraxShare-Setup.exe"
+                className="inline-flex items-center justify-center rounded-full bg-mint-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-mint-700"
+              >
+                {t('landing.ctaWindows')}
+              </a>
+              <div className="mt-2 text-xs text-slate-600">{t('landing.ctaWindowsHint')}</div>
+            </div>
+          )}
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white/60 px-4 py-3 text-xs text-slate-500">
             {t('landing.browserNote')}
           </div>

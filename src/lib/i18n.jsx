@@ -17,7 +17,8 @@ const translations = {
     'landing.ctaHost': 'Host a session',
     'landing.ctaJoin': 'Join a session',
     'landing.ctaWindows': 'Download for Windows',
-    'landing.ctaWindowsHint': 'No npm setup required. Install and run on desktop.',
+    'landing.ctaWindowsHint':
+      'Having issues with web audio? Download the desktop version for better system audio.',
     'landing.browserNote': 'Works best in Chrome or Edge for screen sharing.',
     'landing.howTitle': 'How it works',
     'landing.step1Title': 'Host creates a room',
@@ -161,7 +162,8 @@ const translations = {
     'landing.ctaHost': 'Crear sesión',
     'landing.ctaJoin': 'Unirse a una sesión',
     'landing.ctaWindows': 'Descargar para Windows',
-    'landing.ctaWindowsHint': 'No requiere npm. Instala y ejecuta en escritorio.',
+    'landing.ctaWindowsHint':
+      'Tienes problemas con el audio web? Descarga la version de escritorio para mejor audio del sistema.',
     'landing.browserNote': 'Funciona mejor en Chrome o Edge para compartir pantalla.',
     'landing.howTitle': 'Cómo funciona',
     'landing.step1Title': 'El host crea una sala',

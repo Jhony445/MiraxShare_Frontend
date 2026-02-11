@@ -31,6 +31,7 @@ function createRoomId() {
 const MAX_VIEWERS = 6;
 const SYSTEM_AUDIO_BITRATE_KBPS = 256;
 const SYSTEM_AUDIO_MAX_AVERAGE_BITRATE = 256000;
+const WEB_AUDIO_PRIORITY_PRESET_KEY = '720p30';
 
 function Host() {
   const isElectronRuntime =
@@ -64,6 +65,7 @@ function Host() {
   const peersRef = useRef(new Map());
   const membersRef = useRef(new Map());
   const qualityRef = useRef(quality);
+  const activePresetRef = useRef(QUALITY_PRESETS[quality]);
   const videoRef = useRef(null);
 
 
@@ -310,7 +312,7 @@ function Host() {
     if (videoTrack) {
       entry.videoSender = await upsertTrackSender(pc, stream, videoTrack);
       if (entry.videoSender) {
-        await applySenderQuality(entry.videoSender, QUALITY_PRESETS[qualityRef.current]);
+        await applySenderQuality(entry.videoSender, activePresetRef.current);
       }
     } else {
       entry.videoSender = findSenderByKind(pc, 'video');
@@ -355,6 +357,64 @@ function Host() {
     await pc.setLocalDescription({ type: offer.type, sdp: optimizedSdp });
     client.signal(targetPeerId, { kind: 'offer', payload: pc.localDescription });
     logEvent(tRef.current('log.signal'), tRef.current('log.offerSent'));
+  }
+
+  function resolveActivePreset(stream, selectedKey) {
+    const selectedPreset = QUALITY_PRESETS[selectedKey] || QUALITY_PRESETS['1080p30'];
+
+    if (isElectronRuntime) {
+      return selectedPreset;
+    }
+
+    const audioTrack = stream?.getAudioTracks?.()[0] || null;
+    const videoTrack = stream?.getVideoTracks?.()[0] || null;
+    const displaySurface = videoTrack?.getSettings?.().displaySurface;
+    const needsAudioPriority =
+      Boolean(audioTrack) && displaySurface && displaySurface !== 'browser';
+
+    if (needsAudioPriority) {
+      return QUALITY_PRESETS[WEB_AUDIO_PRIORITY_PRESET_KEY] || selectedPreset;
+    }
+
+    return selectedPreset;
+  }
+
+  async function getWebDisplayStream() {
+    const enhancedConstraints = {
+      video: true,
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false,
+        channelCount: 2,
+        sampleRate: 48000,
+        sampleSize: 16,
+        suppressLocalAudioPlayback: false,
+      },
+      systemAudio: 'include',
+      monitorTypeSurfaces: 'include',
+      surfaceSwitching: 'include',
+      selfBrowserSurface: 'exclude',
+    };
+
+    try {
+      return await navigator.mediaDevices.getDisplayMedia(enhancedConstraints);
+    } catch (err) {
+      if (!(err instanceof TypeError)) {
+        throw err;
+      }
+
+      return navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+          channelCount: 2,
+          sampleRate: 48000,
+        },
+      });
+    }
   }
 
   async function handleSignal(peerId, data) {
@@ -534,7 +594,9 @@ function Host() {
       }
     }
 
-    await applyCaptureConstraints(QUALITY_PRESETS[qualityRef.current]);
+    const activePreset = resolveActivePreset(stream, qualityRef.current);
+    activePresetRef.current = activePreset;
+    await applyCaptureConstraints(activePreset);
 
     const peers = Array.from(peersRef.current.entries());
     if (peers.length === 0) {
@@ -574,16 +636,7 @@ function Host() {
         return;
       }
 
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false,
-          channelCount: 2,
-          sampleRate: 48000,
-        },
-      });
+      const stream = await getWebDisplayStream();
 
       await activateSharedStream(stream, { tuneAudio: true });
     } catch (err) {
@@ -639,12 +692,17 @@ function Host() {
     setQuality(next);
     qualityRef.current = next;
     logEvent(tRef.current('log.quality'), QUALITY_PRESETS[next].label);
+
+    const stream = streamRef.current;
+    const activePreset = resolveActivePreset(stream, next);
+    activePresetRef.current = activePreset;
+
     for (const entry of peersRef.current.values()) {
       if (entry.videoSender) {
-        await applySenderQuality(entry.videoSender, QUALITY_PRESETS[next]);
+        await applySenderQuality(entry.videoSender, activePreset);
       }
     }
-    await applyCaptureConstraints(QUALITY_PRESETS[next]);
+    await applyCaptureConstraints(activePreset);
   }
 
   function copyRoomId() {
