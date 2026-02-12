@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Syne:wght@500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,6 +6,16 @@
 
 :root {
   color-scheme: light;
+  --mx-bg: #f4f5ef;
+  --mx-surface: #fffdf8;
+  --mx-surface-soft: #f9f8f2;
+  --mx-text: #1d2a2a;
+  --mx-muted: #587070;
+  --mx-line: #d8ddd2;
+  --mx-accent: #0f766e;
+  --mx-accent-strong: #0c5e59;
+  --mx-highlight: #dd6b20;
+  --mx-shadow: 0 20px 40px rgba(22, 39, 40, 0.09);
 }
 
 * {
@@ -20,17 +30,96 @@ body,
 
 body {
   margin: 0;
-  font-family: 'Manrope', sans-serif;
-  color: #0f172a;
-  background: radial-gradient(1200px 600px at 10% -10%, rgba(43, 133, 255, 0.18), transparent 60%),
-    radial-gradient(1000px 600px at 90% 0%, rgba(26, 162, 144, 0.18), transparent 55%),
-    #f8fafc;
+  font-family: 'Lexend', sans-serif;
+  color: var(--mx-text);
+  background:
+    radial-gradient(900px 500px at 8% -12%, rgba(15, 118, 110, 0.22), transparent 62%),
+    radial-gradient(900px 450px at 92% -14%, rgba(221, 107, 32, 0.2), transparent 58%),
+    linear-gradient(180deg, #fbfcf7 0%, var(--mx-bg) 52%, #eff1e7 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image: linear-gradient(rgba(65, 87, 84, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(65, 87, 84, 0.08) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle at center, black 35%, transparent 100%);
+}
+
+a {
+  color: inherit;
 }
 
 .mx-container {
-  @apply mx-auto w-full max-w-5xl px-5 md:px-8;
+  @apply mx-auto w-full max-w-6xl px-4 md:px-8;
 }
 
 .mx-card {
-  @apply rounded-2xl border border-white/70 bg-white/80 shadow-soft backdrop-blur;
+  border: 1px solid color-mix(in srgb, var(--mx-line) 85%, white 15%);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.93) 0%, rgba(249, 248, 242, 0.86) 100%);
+  box-shadow: var(--mx-shadow);
+  @apply rounded-3xl backdrop-blur;
+  animation: mx-enter-up 420ms ease both;
+}
+
+.mx-kicker {
+  @apply inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.12em] uppercase;
+  background: color-mix(in srgb, var(--mx-accent) 10%, white 90%);
+  color: var(--mx-accent-strong);
+  border: 1px solid color-mix(in srgb, var(--mx-accent) 24%, white 76%);
+}
+
+.mx-btn-primary {
+  @apply inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-white transition;
+  background: linear-gradient(135deg, #0f766e 0%, #0c5e59 100%);
+  box-shadow: 0 12px 24px rgba(12, 94, 89, 0.28);
+}
+
+.mx-btn-primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+
+.mx-btn-secondary {
+  @apply inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold transition;
+  color: #134946;
+  background: rgba(255, 255, 255, 0.84);
+  border: 1px solid color-mix(in srgb, var(--mx-line) 80%, white 20%);
+}
+
+.mx-btn-secondary:hover {
+  border-color: color-mix(in srgb, var(--mx-accent) 36%, white 64%);
+  color: var(--mx-accent-strong);
+}
+
+input:not([type='range']),
+select,
+textarea {
+  border-radius: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--mx-line) 82%, white 18%);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--mx-text);
+}
+
+input:not([type='range']):focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--mx-accent) 35%, transparent 65%);
+  outline-offset: 1px;
+}
+
+@keyframes mx-enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

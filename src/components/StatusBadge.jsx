@@ -1,19 +1,19 @@
 const styles = {
-  ok: 'border-mint-200 bg-mint-100 text-mint-700',
-  info: 'border-brand-200 bg-brand-100 text-brand-700',
-  warn: 'border-amber-200 bg-amber-100 text-amber-700',
-  error: 'border-rose-200 bg-rose-100 text-rose-700',
-  neutral: 'border-slate-200 bg-slate-100 text-slate-600',
+  ok: 'border-brand-200 bg-brand-50 text-brand-800',
+  info: 'border-sky-200 bg-sky-50 text-sky-700',
+  warn: 'border-mint-200 bg-mint-50 text-mint-700',
+  error: 'border-rose-200 bg-rose-50 text-rose-700',
+  neutral: 'border-slate-200 bg-white/80 text-slate-600',
 };
 
 function StatusBadge({ label, tone = 'neutral' }) {
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${
+      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-[0.06em] uppercase ${
         styles[tone] || styles.neutral
       }`}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
       {label}
     </span>
   );

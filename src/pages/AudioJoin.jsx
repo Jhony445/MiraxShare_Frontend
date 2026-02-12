@@ -2,15 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LogPanel from '../components/LogPanel.jsx';
+import UsernameModal from '../components/UsernameModal.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
 import { createPeerConnection, closePeerConnection } from '../lib/webrtc.js';
 import { clearLog, logEvent } from '../lib/logger.js';
 import { WS_URL } from '../lib/config.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useUsername } from '../lib/userProfile.js';
-import UsernameModal from '../components/UsernameModal.jsx';
 
-function Join() {
+function AudioJoin() {
   const [roomId, setRoomId] = useState('');
   const [wsStatus, setWsStatus] = useState('connecting');
   const [peerId, setPeerId] = useState(null);
@@ -18,9 +18,9 @@ function Join() {
   const [hostId, setHostId] = useState(null);
   const [pcState, setPcState] = useState('idle');
   const [error, setError] = useState('');
-  const [viewMode, setViewMode] = useState('contain');
   const [volume, setVolume] = useState(100);
   const [members, setMembers] = useState([]);
+
   const { t } = useI18n();
   const tRef = useRef(t);
   const { username, needsPrompt, persistUsername } = useUsername();
@@ -28,17 +28,17 @@ function Join() {
   const clientRef = useRef(null);
   const pcRef = useRef(null);
   const hostRef = useRef(null);
-  const videoRef = useRef(null);
+  const audioRef = useRef(null);
   const membersRef = useRef(new Map());
   const clientCleanupRef = useRef(null);
 
   useEffect(() => {
-    hostRef.current = hostId;
-  }, [hostId]);
-
-  useEffect(() => {
     tRef.current = t;
   }, [t]);
+
+  useEffect(() => {
+    hostRef.current = hostId;
+  }, [hostId]);
 
   useEffect(() => {
     if (hostId && username && peerId) {
@@ -47,8 +47,8 @@ function Join() {
   }, [hostId, username, peerId]);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.volume = Math.min(1, Math.max(0, volume / 100));
+    if (audioRef.current) {
+      audioRef.current.volume = Math.min(1, Math.max(0, volume / 100));
     }
   }, [volume]);
 
@@ -69,11 +69,7 @@ function Join() {
     clientRef.current = client;
 
     const offStatus = client.on('status', ({ status }) => setWsStatus(status));
-
-    const offOpen = client.on('open', () => {
-      logEvent(tRef.current('log.wsConnected'), WS_URL);
-    });
-
+    const offOpen = client.on('open', () => logEvent(tRef.current('log.wsConnected'), WS_URL));
     const offWelcome = client.on('welcome', ({ peerId: id }) => {
       setPeerId(id);
       logEvent(tRef.current('log.welcome'), tRef.current('log.peerId', { id }));
@@ -86,9 +82,11 @@ function Join() {
         tRef.current('log.joined'),
         tRef.current('log.hostId', { hostId: host || tRef.current('common.none') })
       );
+
       if (Array.isArray(peers) && peers.length > 0) {
         logEvent(tRef.current('log.peers'), tRef.current('log.peersCount', { count: peers.length }));
       }
+
       if (host) {
         ensurePeerConnection(host);
       }
@@ -96,17 +94,13 @@ function Join() {
       if (peerId && username) {
         upsertMember(peerId, { name: username, role: 'viewer' });
       }
+
       if (host) {
         upsertMember(host, { name: tRef.current('members.unknown'), role: 'host' });
       }
     });
 
     const offPeerJoined = client.on('peer-joined', ({ peerId: id, role }) => {
-      const roleLabel = tRef.current(`roles.${role}`);
-      logEvent(
-        tRef.current('log.peerJoined'),
-        tRef.current('log.peerRole', { peerId: id, role: roleLabel })
-      );
       if (role === 'host') {
         setHostId(id);
         ensurePeerConnection(id);
@@ -115,7 +109,6 @@ function Join() {
     });
 
     const offPeerLeft = client.on('peer-left', ({ peerId: id }) => {
-      logEvent(tRef.current('log.peerLeft'), tRef.current('log.peerId', { id }));
       if (hostRef.current === id) {
         cleanupPeerConnection();
         setHostId(null);
@@ -130,8 +123,9 @@ function Join() {
         }
         return;
       }
+
       if (hostRef.current && from !== hostRef.current) return;
-      handleSignal(data);
+      void handleSignal(data);
     });
 
     const offError = client.on('error', ({ code, message }) => {
@@ -171,9 +165,7 @@ function Join() {
 
   function setMembersFromRoster(roster) {
     const map = new Map();
-    roster.forEach((member) => {
-      map.set(member.peerId, member);
-    });
+    roster.forEach((member) => map.set(member.peerId, member));
     membersRef.current = map;
     updateMembersState();
   }
@@ -184,24 +176,18 @@ function Join() {
     if (!client) return;
 
     const pc = createPeerConnection({
-      onIceCandidate: (candidate) => {
-        client.signal(targetPeerId, { kind: 'ice', payload: candidate });
-      },
+      onIceCandidate: (candidate) => client.signal(targetPeerId, { kind: 'ice', payload: candidate }),
       onTrack: (event) => {
         const stream = event.streams[0];
-        if (videoRef.current && stream) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.volume = Math.min(1, Math.max(0, volume / 100));
-          videoRef.current
-            .play()
-            .catch(() => {
-              // Autoplay can still be blocked by Chromium policy in some environments.
-            });
+        if (audioRef.current && stream) {
+          audioRef.current.srcObject = stream;
+          audioRef.current.volume = Math.min(1, Math.max(0, volume / 100));
+          audioRef.current.play().catch(() => {
+            // Autoplay may require user interaction.
+          });
         }
       },
-      onConnectionStateChange: (state) => {
-        setPcState(state);
-      },
+      onConnectionStateChange: (state) => setPcState(state),
     });
 
     pcRef.current = pc;
@@ -212,22 +198,15 @@ function Join() {
     if (!data) return;
 
     if (data.kind === 'offer') {
-      if (pcRef.current) {
-        cleanupPeerConnection();
-      }
-      if (hostRef.current) {
-        ensurePeerConnection(hostRef.current);
-      }
+      if (pcRef.current) cleanupPeerConnection();
+      if (hostRef.current) ensurePeerConnection(hostRef.current);
       const pc = pcRef.current;
       if (!pc) return;
+
       await pc.setRemoteDescription(data.payload);
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
-      clientRef.current.signal(hostRef.current, {
-        kind: 'answer',
-        payload: pc.localDescription,
-      });
-      logEvent(tRef.current('log.signal'), tRef.current('log.answerSent'));
+      clientRef.current.signal(hostRef.current, { kind: 'answer', payload: pc.localDescription });
       return;
     }
 
@@ -235,9 +214,8 @@ function Join() {
       if (!pcRef.current) return;
       try {
         await pcRef.current.addIceCandidate(data.payload);
-        logEvent(tRef.current('log.signal'), tRef.current('log.iceAdded'));
       } catch (_err) {
-        logEvent(tRef.current('log.signal'), tRef.current('log.iceFailed'));
+        // Ignore invalid ICE candidates.
       }
     }
   }
@@ -248,17 +226,19 @@ function Join() {
       pcRef.current = null;
     }
     setPcState('idle');
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
+    if (audioRef.current) {
+      audioRef.current.srcObject = null;
     }
   }
 
   function joinRoom() {
     setError('');
+
     if (!username) {
       setError(t('user.errorRequired'));
       return;
     }
+
     const trimmed = roomId.trim().toUpperCase();
     if (!trimmed) {
       setError(t('join.errorEmptyRoom'));
@@ -277,7 +257,7 @@ function Join() {
     setHostId(null);
     setRoomId(trimmed);
     clientRef.current.join(trimmed, 'viewer', { name: username });
-    logEvent(t('log.join'), t('log.room', { roomId: trimmed }));
+    logEvent(tRef.current('log.join'), tRef.current('log.room', { roomId: trimmed }));
   }
 
   function disconnectRoom() {
@@ -309,34 +289,24 @@ function Join() {
     });
   }
 
-  function toggleViewMode() {
-    setViewMode((prev) => (prev === 'contain' ? 'cover' : 'contain'));
-  }
-
-  function requestFullscreen() {
-    if (!videoRef.current) return;
-    if (videoRef.current.requestFullscreen) {
-      videoRef.current.requestFullscreen();
-    }
-  }
-
   return (
     <Layout>
       <UsernameModal open={needsPrompt} onSave={persistUsername} />
       <div className="mb-6 rounded-3xl border border-brand-100 bg-gradient-to-r from-brand-50 to-white px-5 py-4">
-        <div className="mx-kicker">{t('join.consoleLabel')}</div>
-        <div className="mt-2 text-sm text-slate-600">{t('join.videoHint')}</div>
+        <div className="mx-kicker">{t('audioJoin.consoleLabel')}</div>
+        <div className="mt-2 text-sm text-slate-600">{t('audioJoin.hint')}</div>
       </div>
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
           <div className="mx-card px-6 py-5">
-            <div className="font-display text-base text-slate-900">{t('join.title')}</div>
+            <div className="font-display text-base text-slate-900">{t('audioJoin.title')}</div>
+
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
                 className="w-full rounded-xl border border-slate-200 bg-white/90 px-4 py-2 text-sm text-slate-700"
                 value={roomId}
                 onChange={(event) => setRoomId(event.target.value.toUpperCase())}
-                placeholder={t('join.placeholder')}
+                placeholder={t('audioJoin.placeholder')}
                 disabled={joined}
               />
               <button
@@ -344,15 +314,13 @@ function Join() {
                 onClick={joined ? disconnectRoom : joinRoom}
                 className="mx-btn-primary px-4 py-2 text-xs"
               >
-                {joined ? t('join.disconnect') : t('join.button')}
+                {joined ? t('audioJoin.disconnect') : t('audioJoin.button')}
               </button>
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
               <StatusBadge
-                label={
-                  wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected')
-                }
+                label={wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected')}
                 tone={wsStatus === 'open' ? 'ok' : 'warn'}
               />
               <StatusBadge
@@ -378,43 +346,18 @@ function Join() {
             )}
           </div>
 
-          <LogPanel title={t('join.logTitle')} />
+          <LogPanel title={t('audioJoin.logTitle')} />
         </div>
 
         <div className="mx-card px-6 py-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="font-display text-base text-slate-900">{t('join.liveViewTitle')}</div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={toggleViewMode}
-                className="mx-btn-secondary px-3 py-1 text-xs"
-              >
-                {viewMode === 'contain' ? t('join.fillScreen') : t('join.fitScreen')}
-              </button>
-              <button
-                type="button"
-                onClick={requestFullscreen}
-                className="mx-btn-secondary px-3 py-1 text-xs"
-              >
-                {t('join.fullscreen')}
-              </button>
-            </div>
-          </div>
+          <div className="font-display text-base text-slate-900">{t('audioJoin.listenTitle')}</div>
 
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-900/5 p-2">
-            <div className="aspect-video w-full overflow-hidden rounded-xl bg-slate-900/10">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className={`h-full w-full ${viewMode === 'contain' ? 'object-contain' : 'object-cover'}`}
-              />
-            </div>
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <audio ref={audioRef} autoPlay controls className="w-full" />
           </div>
 
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs font-semibold text-slate-600">{t('join.volume')}</div>
+            <div className="text-xs font-semibold text-slate-600">{t('audioJoin.volume')}</div>
             <div className="flex w-full items-center gap-3 sm:max-w-xs">
               <input
                 type="range"
@@ -428,9 +371,7 @@ function Join() {
             </div>
           </div>
 
-          <div className="mt-3 text-xs text-slate-500">
-            {t('join.videoHint')}
-          </div>
+          <div className="mt-3 text-xs text-slate-500">{t('audioJoin.hint')}</div>
         </div>
 
         <div className="mx-card px-6 py-5 lg:col-span-2">
@@ -471,4 +412,4 @@ function Join() {
   );
 }
 
-export default Join;
+export default AudioJoin;

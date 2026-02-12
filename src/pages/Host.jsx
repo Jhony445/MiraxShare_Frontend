@@ -715,10 +715,14 @@ function Host() {
   return (
     <Layout>
       <UsernameModal open={needsPrompt} onSave={persistUsername} />
+      <div className="mb-6 rounded-3xl border border-brand-100 bg-gradient-to-r from-brand-50 to-white px-5 py-4">
+        <div className="mx-kicker">{t('host.consoleLabel')}</div>
+        <div className="mt-2 text-sm text-slate-600">{t('host.audioBestTip')}</div>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-6">
           <div className="mx-card px-6 py-5">
-            <div className="text-sm font-semibold text-slate-800">{t('host.roomTitle')}</div>
+            <div className="font-display text-base text-slate-900">{t('host.roomTitle')}</div>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
                 className="w-full rounded-xl border border-slate-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-800"
@@ -728,7 +732,7 @@ function Host() {
               <button
                 type="button"
                 onClick={copyRoomId}
-                className="rounded-xl border border-slate-200 bg-white/90 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-200 hover:text-brand-700"
+                className="mx-btn-secondary px-4 py-2 text-xs"
               >
                 {t('host.copy')}
               </button>
@@ -772,7 +776,7 @@ function Host() {
           <div className="mx-card px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-800">{t('host.screenShareTitle')}</div>
+                <div className="font-display text-base text-slate-900">{t('host.screenShareTitle')}</div>
                 <div className="text-xs text-slate-500">
                   {peerId ? t('host.hostRole', { peerId }) : t('host.hostRoleWaiting')}
                 </div>
@@ -781,14 +785,14 @@ function Host() {
                 <button
                   type="button"
                   onClick={startShare}
-                  className="rounded-full bg-brand-600 px-4 py-2 text-xs font-semibold text-white shadow-soft transition hover:bg-brand-700"
+                  className="mx-btn-primary px-4 py-2 text-xs"
                 >
                   {t('host.startShare')}
                 </button>
                 <button
                   type="button"
                   onClick={stopShare}
-                  className="rounded-full border border-slate-200 bg-white/90 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-rose-200 hover:text-rose-600"
+                  className="mx-btn-secondary px-4 py-2 text-xs hover:border-rose-200 hover:text-rose-600"
                 >
                   {t('host.stopShare')}
                 </button>
@@ -856,7 +860,7 @@ function Host() {
         </div>
 
         <div className="mx-card px-6 py-5">
-          <div className="text-sm font-semibold text-slate-800">{t('host.previewTitle')}</div>
+          <div className="font-display text-base text-slate-900">{t('host.previewTitle')}</div>
           <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-900/5">
             <video
               ref={videoRef}
@@ -872,7 +876,7 @@ function Host() {
         </div>
 
         <div className="mx-card px-6 py-5 lg:col-span-2">
-          <div className="text-sm font-semibold text-slate-800">{t('members.title')}</div>
+          <div className="font-display text-base text-slate-900">{t('members.title')}</div>
           <div className="mt-3 space-y-2">
             {members.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-white/60 px-3 py-3 text-xs text-slate-500">
