@@ -1,19 +1,32 @@
 const styles = {
-  ok: 'border-brand-200 bg-brand-50 text-brand-800',
-  info: 'border-sky-200 bg-sky-50 text-sky-700',
-  warn: 'border-mint-200 bg-mint-50 text-mint-700',
-  error: 'border-rose-200 bg-rose-50 text-rose-700',
-  neutral: 'border-slate-200 bg-white/80 text-slate-600',
+  ok: {
+    className: 'border-brand-400/42 bg-brand-500/22 text-brand-50',
+    dotClass: 'bg-brand-300 shadow-[0_0_0_4px_rgba(20,184,166,0.18)]',
+  },
+  info: {
+    className: 'border-sky-400/42 bg-sky-500/22 text-sky-50',
+    dotClass: 'bg-sky-300 shadow-[0_0_0_4px_rgba(56,189,248,0.18)]',
+  },
+  warn: {
+    className: 'border-copper-400/42 bg-copper-500/22 text-copper-50',
+    dotClass: 'bg-copper-300 shadow-[0_0_0_4px_rgba(207,109,32,0.18)]',
+  },
+  error: {
+    className: 'border-rose-400/42 bg-rose-500/22 text-rose-50',
+    dotClass: 'bg-rose-300 shadow-[0_0_0_4px_rgba(251,113,133,0.18)]',
+  },
+  neutral: {
+    className: 'border-white/14 bg-white/[0.08] text-white/82',
+    dotClass: 'bg-white/45 shadow-[0_0_0_4px_rgba(255,255,255,0.08)]',
+  },
 };
 
 function StatusBadge({ label, tone = 'neutral' }) {
+  const style = styles[tone] || styles.neutral;
+
   return (
-    <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-[0.06em] uppercase ${
-        styles[tone] || styles.neutral
-      }`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+    <span className={`mx-status-badge ${style.className}`}>
+      <span aria-hidden="true" className={`mx-status-glyph ${style.dotClass}`} />
       {label}
     </span>
   );

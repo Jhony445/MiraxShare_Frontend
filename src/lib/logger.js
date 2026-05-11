@@ -42,13 +42,16 @@ export function subscribe(listener) {
   return () => listeners.delete(listener);
 }
 
-export function useLog() {
+export function useLog(enabled = true) {
   const [logs, setLogs] = useState(getLogs());
 
   useEffect(() => {
+    if (!enabled) return undefined;
+
+    setLogs(getLogs());
     const unsubscribe = subscribe(() => setLogs(getLogs()));
     return unsubscribe;
-  }, []);
+  }, [enabled]);
 
-  return logs;
+  return enabled ? logs : [];
 }

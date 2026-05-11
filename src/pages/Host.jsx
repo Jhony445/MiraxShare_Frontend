@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LogPanel from '../components/LogPanel.jsx';
+import {
+  FieldLabel,
+  InlineMessage,
+  MemberList,
+  MetricStrip,
+  PageHero,
+  PanelCard,
+} from '../components/StudioPrimitives.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
 import {
   createPeerConnection,
@@ -712,201 +720,190 @@ function Host() {
     );
   }
 
+  const heroMetrics = [
+    {
+      label: t('host.roomTitle'),
+      value: roomId,
+      detail: joined ? t('status.roomJoined') : t('status.joining'),
+      tone: 'brand',
+    },
+    {
+      label: t('members.title'),
+      value: `${viewerCount}/${MAX_VIEWERS}`,
+      detail: t('status.connections', { count: connectedCount }),
+      tone: 'neutral',
+    },
+    {
+      label: t('status.sharing'),
+      value: isSharing ? t('status.sharing') : t('status.notSharing'),
+      detail: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
+      tone: isSharing ? 'copper' : 'neutral',
+    },
+    {
+      label: t('host.qualityLabel'),
+      value: QUALITY_PRESETS[quality]?.label || quality,
+      detail: null,
+      tone: 'neutral',
+    },
+  ];
+
+  const statusBadges = [
+    {
+      label: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
+      tone: wsStatus === 'open' ? 'ok' : 'warn',
+    },
+    {
+      label: joined ? t('status.roomJoined') : t('status.joining'),
+      tone: joined ? 'ok' : 'neutral',
+    },
+    {
+      label: t('status.viewers', { count: viewerCount, max: MAX_VIEWERS }),
+      tone: viewerCount > 0 ? 'ok' : 'warn',
+    },
+    {
+      label: isSharing ? t('status.sharing') : t('status.notSharing'),
+      tone: isSharing ? 'ok' : 'warn',
+    },
+    {
+      label: t('status.connections', { count: connectedCount }),
+      tone: connectedCount > 0 ? 'ok' : 'neutral',
+    },
+  ];
+
   return (
     <Layout>
       <UsernameModal open={needsPrompt} onSave={persistUsername} />
-      <div className="mb-6 rounded-3xl border border-brand-100 bg-gradient-to-r from-brand-50 to-white px-5 py-4">
-        <div className="mx-kicker">{t('host.consoleLabel')}</div>
-        <div className="mt-2 text-sm text-slate-600">{t('host.audioBestTip')}</div>
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+      <PageHero
+        eyebrow={t('host.consoleLabel')}
+        title={t('host.screenShareTitle')}
+        description={t('host.audioBestTip')}
+        actions={
+          <>
+            <button type="button" onClick={startShare} className="mx-btn-primary">
+              {t('host.startShare')}
+            </button>
+            <button type="button" onClick={stopShare} className="mx-btn-danger">
+              {t('host.stopShare')}
+            </button>
+          </>
+        }
+      >
+        <MetricStrip items={heroMetrics} className="xl:grid-cols-4" />
+      </PageHero>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.28fr_0.72fr]">
         <div className="space-y-6">
-          <div className="mx-card px-6 py-5">
-            <div className="font-display text-base text-slate-900">{t('host.roomTitle')}</div>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                className="w-full rounded-xl border border-slate-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-800"
-                value={roomId}
-                readOnly
-              />
-              <button
-                type="button"
-                onClick={copyRoomId}
-                className="mx-btn-secondary px-4 py-2 text-xs"
-              >
+          <PanelCard
+            title={t('host.roomTitle')}
+            description={t('host.audioBestTip')}
+            actions={
+              <button type="button" onClick={copyRoomId} className="mx-btn-secondary text-xs">
                 {t('host.copy')}
               </button>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <StatusBadge
-                label={
-                  wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected')
-                }
-                tone={wsStatus === 'open' ? 'ok' : 'warn'}
-              />
-              <StatusBadge
-                label={joined ? t('status.roomJoined') : t('status.joining')}
-                tone={joined ? 'info' : 'neutral'}
-              />
-              <StatusBadge
-                label={t('status.viewers', { count: viewerCount, max: MAX_VIEWERS })}
-                tone={viewerCount > 0 ? 'ok' : 'neutral'}
-              />
-              <StatusBadge
-                label={isSharing ? t('status.sharing') : t('status.notSharing')}
-                tone={isSharing ? 'ok' : 'neutral'}
-              />
-              <StatusBadge
-                label={t('status.connections', { count: connectedCount })}
-                tone={connectedCount > 0 ? 'ok' : 'neutral'}
-              />
-            </div>
-            {notice && (
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-700">
-                {notice}
-              </div>
-            )}
-            {error && (
-              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-                {error}
-              </div>
-            )}
-          </div>
-
-          <div className="mx-card px-6 py-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            }
+          >
+            <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
               <div>
-                <div className="font-display text-base text-slate-900">{t('host.screenShareTitle')}</div>
-                <div className="text-xs text-slate-500">
-                  {peerId ? t('host.hostRole', { peerId }) : t('host.hostRoleWaiting')}
-                </div>
+                <FieldLabel htmlFor="host-room-code" label={t('host.roomTitle')} aside={joined ? t('status.roomJoined') : t('status.joining')} />
+                <input id="host-room-code" className="mx-input mx-code text-lg font-semibold tracking-[0.24em]" value={roomId} readOnly />
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={startShare}
-                  className="mx-btn-primary px-4 py-2 text-xs"
-                >
-                  {t('host.startShare')}
-                </button>
-                <button
-                  type="button"
-                  onClick={stopShare}
-                  className="mx-btn-secondary px-4 py-2 text-xs hover:border-rose-200 hover:text-rose-600"
-                >
-                  {t('host.stopShare')}
-                </button>
+              <div className="mx-control-strip">
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/42">{t('status.wsConnected')}</div>
+                <div className="mt-2 text-sm leading-7 text-white/64">{t('host.audioTip')}</div>
               </div>
-            </div>
-            <div className="mt-4">
-              <label className="text-xs font-semibold text-slate-600">{t('host.qualityLabel')}</label>
-              <select
-                value={quality}
-                onChange={handleQualityChange}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-700"
-              >
-                {QUALITY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label} ({option.maxBitrateKbps} kbps)
-                  </option>
-                ))}
-              </select>
             </div>
 
-            {isElectronRuntime && (
-              <div className="mt-4">
-                <div className="flex items-center justify-between gap-3">
-                  <label className="text-xs font-semibold text-slate-600">{t('host.captureSourceLabel')}</label>
-                  <button
-                    type="button"
-                    onClick={loadCaptureSources}
-                    disabled={isLoadingSources}
-                    className="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-brand-200 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isLoadingSources ? t('host.captureSourceLoading') : t('host.captureRefresh')}
-                  </button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {statusBadges.map((badge) => (
+                <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />
+              ))}
+            </div>
+
+            {notice ? <div className="mt-4"><InlineMessage tone="warn">{notice}</InlineMessage></div> : null}
+            {error ? <div className="mt-3"><InlineMessage tone="error">{error}</InlineMessage></div> : null}
+          </PanelCard>
+
+          <PanelCard tone="dark" title={t('host.previewTitle')} description={t('host.previewNote')}>
+            <div className="mx-stage-viewport mx-stage-screen aspect-video">
+              {!isSharing && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center p-6 text-center">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-200">{t('status.notSharing')}</div>
+                    <div className="mt-3 font-display text-2xl tracking-[-0.03em] text-white">{t('host.startShare')}</div>
+                    <p className="mt-2 max-w-sm text-sm leading-7 text-white/68">{t('host.previewNote')}</p>
+                  </div>
                 </div>
-                <select
-                  value={selectedSourceId}
-                  onChange={(event) => setSelectedSourceId(event.target.value)}
-                  disabled={isLoadingSources || captureSources.length === 0}
-                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {captureSources.length === 0 ? (
-                    <option value="">{t('host.captureSourceEmpty')}</option>
-                  ) : (
-                    captureSources.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.kind === 'screen' ? 'Screen' : 'Window'} - {source.name}
-                      </option>
-                    ))
-                  )}
+              )}
+              <video ref={videoRef} autoPlay muted playsInline className="relative z-0 h-full w-full object-cover" />
+            </div>
+          </PanelCard>
+        </div>
+
+        <div className="space-y-6">
+          <PanelCard title={t('host.screenShareTitle')} description={isElectronRuntime ? t('host.electronAudioEnabled') : t('host.audioBestTip')}>
+            <div className="space-y-4">
+              <div>
+                <FieldLabel htmlFor="host-quality" label={t('host.qualityLabel')} />
+                <select id="host-quality" value={quality} onChange={handleQualityChange} className="mx-select text-sm text-white">
+                  {QUALITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label} ({option.maxBitrateKbps} kbps)
+                    </option>
+                  ))}
                 </select>
-                <div className="mt-1 text-xs text-slate-500">{t('host.captureSourceHint')}</div>
               </div>
-            )}
 
-            {isElectronRuntime ? (
-              <div className="mt-3 text-xs text-slate-500">{t('host.electronAudioEnabled')}</div>
-            ) : (
-              <>
-                <div className="mt-3 text-xs text-slate-500">{t('host.audioTip')}</div>
-                <div className="mt-1 text-xs text-slate-500">{t('host.audioBestTip')}</div>
-              </>
-            )}
-          </div>
+              {isElectronRuntime && (
+                <div>
+                  <FieldLabel
+                    htmlFor="host-capture-source"
+                    label={t('host.captureSourceLabel')}
+                    aside={
+                      <button
+                        type="button"
+                        onClick={loadCaptureSources}
+                        disabled={isLoadingSources}
+                        className="mx-btn-ghost px-3 py-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {isLoadingSources ? t('host.captureSourceLoading') : t('host.captureRefresh')}
+                      </button>
+                    }
+                  />
+                  <select
+                    id="host-capture-source"
+                    value={selectedSourceId}
+                    onChange={(event) => setSelectedSourceId(event.target.value)}
+                    disabled={isLoadingSources || captureSources.length === 0}
+                    className="mx-select text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {captureSources.length === 0 ? (
+                      <option value="">{t('host.captureSourceEmpty')}</option>
+                    ) : (
+                      captureSources.map((source) => (
+                        <option key={source.id} value={source.id}>
+                          {source.kind === 'screen' ? 'Screen' : 'Window'} - {source.name}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <div className="mt-2 text-sm leading-7 text-white/64">{t('host.captureSourceHint')}</div>
+                </div>
+              )}
+
+              {!isElectronRuntime && <InlineMessage tone="info">{t('host.audioTip')}</InlineMessage>}
+            </div>
+          </PanelCard>
+
+          <MemberList
+            title={t('members.title')}
+            description={t('status.viewers', { count: viewerCount, max: MAX_VIEWERS })}
+            members={members}
+            emptyLabel={t('members.empty')}
+            selfPeerId={peerId}
+            getRoleLabel={(role) => (role === 'self' ? t('members.you') : t(`roles.${role}`))}
+          />
 
           <LogPanel title={t('host.logTitle')} />
-        </div>
-
-        <div className="mx-card px-6 py-5">
-          <div className="font-display text-base text-slate-900">{t('host.previewTitle')}</div>
-          <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-slate-900/5">
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              playsInline
-              className="h-72 w-full object-cover"
-            />
-          </div>
-          <div className="mt-3 text-xs text-slate-500">
-            {t('host.previewNote')}
-          </div>
-        </div>
-
-        <div className="mx-card px-6 py-5 lg:col-span-2">
-          <div className="font-display text-base text-slate-900">{t('members.title')}</div>
-          <div className="mt-3 space-y-2">
-            {members.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-white/60 px-3 py-3 text-xs text-slate-500">
-                {t('members.empty')}
-              </div>
-            ) : (
-              members.map((member) => {
-                const isSelf = member.peerId === peerId;
-                return (
-                  <div
-                    key={member.peerId}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 bg-white/80 px-3 py-2"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-                        {member.name?.slice(0, 2)?.toUpperCase() || 'MX'}
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-slate-800">
-                          {member.name}{' '}
-                          {isSelf && <span className="text-xs text-slate-400">({t('members.you')})</span>}
-                        </div>
-                        <div className="text-xs text-slate-500">{t(`roles.${member.role}`)}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
         </div>
       </div>
     </Layout>

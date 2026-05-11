@@ -12,11 +12,9 @@ const isElectronRuntime =
 const Router = isElectronRuntime ? HashRouter : BrowserRouter;
 
 ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <I18nProvider>
-      <Router>
-        <App />
-      </Router>
-    </I18nProvider>
-  </React.StrictMode>
+  <I18nProvider>
+    <Router>
+      <App />
+    </Router>
+  </I18nProvider>
 );

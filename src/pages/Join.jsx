@@ -2,6 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LogPanel from '../components/LogPanel.jsx';
+import {
+  FieldLabel,
+  InlineMessage,
+  MemberList,
+  MetricStrip,
+  PageHero,
+  PanelCard,
+} from '../components/StudioPrimitives.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
 import { createPeerConnection, closePeerConnection } from '../lib/webrtc.js';
 import { clearLog, logEvent } from '../lib/logger.js';
@@ -320,151 +328,159 @@ function Join() {
     }
   }
 
+  const resolvedPcState = t(`pc.${pcState}`) === `pc.${pcState}` ? pcState : t(`pc.${pcState}`);
+
+  const heroMetrics = [
+    {
+      label: t('join.title'),
+      value: joined ? roomId : '--',
+      detail: joined ? t('status.roomJoined') : t('status.notJoined'),
+      tone: 'brand',
+    },
+    {
+      label: t('status.hostAvailable'),
+      value: hostId ? t('status.hostAvailable') : t('status.waitingHost'),
+      detail: joined ? t('status.roomJoined') : t('common.waiting'),
+      tone: hostId ? 'copper' : 'neutral',
+    },
+    {
+      label: t('status.pc', { state: '' }).trim(),
+      value: resolvedPcState,
+      detail: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
+      tone: pcState === 'connected' ? 'brand' : 'neutral',
+    },
+    {
+      label: t('join.volume'),
+      value: `${volume}%`,
+      detail: joined ? t('join.liveViewTitle') : t('common.waiting'),
+      tone: 'neutral',
+    },
+  ];
+
+  const statusBadges = [
+    {
+      label: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
+      tone: wsStatus === 'open' ? 'ok' : 'warn',
+    },
+    {
+      label: joined ? t('status.roomJoined') : t('status.notJoined'),
+      tone: joined ? 'ok' : 'neutral',
+    },
+    {
+      label: hostId ? t('status.hostAvailable') : t('status.waitingHost'),
+      tone: hostId ? 'ok' : 'warn',
+    },
+    {
+      label: t('status.pc', { state: resolvedPcState }),
+      tone: pcState === 'connected' ? 'ok' : 'neutral',
+    },
+  ];
+
   return (
     <Layout>
       <UsernameModal open={needsPrompt} onSave={persistUsername} />
-      <div className="mb-6 rounded-3xl border border-brand-100 bg-gradient-to-r from-brand-50 to-white px-5 py-4">
-        <div className="mx-kicker">{t('join.consoleLabel')}</div>
-        <div className="mt-2 text-sm text-slate-600">{t('join.videoHint')}</div>
-      </div>
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+      <PageHero eyebrow={t('join.consoleLabel')} title={t('join.title')} description={t('join.videoHint')}>
+        <MetricStrip items={heroMetrics} className="xl:grid-cols-4" />
+      </PageHero>
+
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
         <div className="space-y-6">
-          <div className="mx-card px-6 py-5">
-            <div className="font-display text-base text-slate-900">{t('join.title')}</div>
-            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <input
-                className="w-full rounded-xl border border-slate-200 bg-white/90 px-4 py-2 text-sm text-slate-700"
-                value={roomId}
-                onChange={(event) => setRoomId(event.target.value.toUpperCase())}
-                placeholder={t('join.placeholder')}
-                disabled={joined}
-              />
-              <button
-                type="button"
-                onClick={joined ? disconnectRoom : joinRoom}
-                className="mx-btn-primary px-4 py-2 text-xs"
-              >
+          <PanelCard
+            title={t('join.title')}
+            description={hostId ? t('status.hostAvailable') : t('status.waitingHost')}
+            actions={
+              <button type="button" onClick={joined ? disconnectRoom : joinRoom} className="mx-btn-primary text-xs">
                 {joined ? t('join.disconnect') : t('join.button')}
               </button>
-            </div>
+            }
+          >
+            <FieldLabel htmlFor="join-room-id" label={t('host.roomTitle')} aside={joined ? t('status.roomJoined') : t('status.notJoined')} />
+            <input
+              id="join-room-id"
+              className="mx-input mx-code text-lg font-semibold tracking-[0.24em]"
+              value={roomId}
+              onChange={(event) => setRoomId(event.target.value.toUpperCase())}
+              placeholder={t('join.placeholder')}
+              disabled={joined}
+            />
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <StatusBadge
-                label={
-                  wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected')
-                }
-                tone={wsStatus === 'open' ? 'ok' : 'warn'}
-              />
-              <StatusBadge
-                label={joined ? t('status.roomJoined') : t('status.notJoined')}
-                tone={joined ? 'info' : 'neutral'}
-              />
-              <StatusBadge
-                label={hostId ? t('status.hostAvailable') : t('status.waitingHost')}
-                tone={hostId ? 'ok' : 'warn'}
-              />
-              <StatusBadge
-                label={t('status.pc', {
-                  state: t(`pc.${pcState}`) === `pc.${pcState}` ? pcState : t(`pc.${pcState}`),
-                })}
-                tone={pcState === 'connected' ? 'ok' : 'neutral'}
-              />
-            </div>
+            {error ? <div className="mt-4"><InlineMessage tone="error">{error}</InlineMessage></div> : null}
+          </PanelCard>
 
-            {error && (
-              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-                {error}
-              </div>
-            )}
-          </div>
-
-          <LogPanel title={t('join.logTitle')} />
-        </div>
-
-        <div className="mx-card px-6 py-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="font-display text-base text-slate-900">{t('join.liveViewTitle')}</div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={toggleViewMode}
-                className="mx-btn-secondary px-3 py-1 text-xs"
-              >
-                {viewMode === 'contain' ? t('join.fillScreen') : t('join.fitScreen')}
-              </button>
-              <button
-                type="button"
-                onClick={requestFullscreen}
-                className="mx-btn-secondary px-3 py-1 text-xs"
-              >
-                {t('join.fullscreen')}
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-900/5 p-2">
-            <div className="aspect-video w-full overflow-hidden rounded-xl bg-slate-900/10">
+          <PanelCard
+            tone="dark"
+            title={t('join.liveViewTitle')}
+            description={t('join.videoHint')}
+            actions={
+              <>
+                <button type="button" onClick={toggleViewMode} className="mx-btn-contrast">
+                  {viewMode === 'contain' ? t('join.fillScreen') : t('join.fitScreen')}
+                </button>
+                <button type="button" onClick={requestFullscreen} className="mx-btn-contrast">
+                  {t('join.fullscreen')}
+                </button>
+              </>
+            }
+          >
+            <div className="mx-stage-viewport mx-stage-screen aspect-video">
+              {!hostId && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center p-6 text-center">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-200">{t('status.waitingHost')}</div>
+                    <div className="mt-3 font-display text-2xl tracking-[-0.03em] text-white">{t('join.liveViewTitle')}</div>
+                    <p className="mt-2 max-w-sm text-sm leading-7 text-white/68">{t('join.videoHint')}</p>
+                  </div>
+                </div>
+              )}
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
-                className={`h-full w-full ${viewMode === 'contain' ? 'object-contain' : 'object-cover'}`}
+                className={`relative z-0 h-full w-full ${viewMode === 'contain' ? 'object-contain' : 'object-cover'}`}
               />
             </div>
-          </div>
 
-          <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-xs font-semibold text-slate-600">{t('join.volume')}</div>
-            <div className="flex w-full items-center gap-3 sm:max-w-xs">
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={volume}
-                onChange={(event) => setVolume(Number(event.target.value))}
-                className="w-full accent-brand-600"
-              />
-              <div className="w-10 text-right text-xs text-slate-500">{volume}</div>
+            <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
+              <div>
+                <div className="mx-field-label">{t('join.volume')}</div>
+                <div className="mt-3 flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volume}
+                    onChange={(event) => setVolume(Number(event.target.value))}
+                    className="w-full accent-brand-600"
+                  />
+                  <div className="w-12 text-right text-sm font-semibold text-white">{volume}%</div>
+                </div>
+              </div>
+              <div className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-xs uppercase tracking-[0.16em] text-white/70">
+                {resolvedPcState}
+              </div>
             </div>
-          </div>
-
-          <div className="mt-3 text-xs text-slate-500">
-            {t('join.videoHint')}
-          </div>
+          </PanelCard>
         </div>
 
-        <div className="mx-card px-6 py-5 lg:col-span-2">
-          <div className="font-display text-base text-slate-900">{t('members.title')}</div>
-          <div className="mt-3 space-y-2">
-            {members.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-white/60 px-3 py-3 text-xs text-slate-500">
-                {t('members.empty')}
-              </div>
-            ) : (
-              members.map((member) => {
-                const isSelf = member.peerId === peerId;
-                return (
-                  <div
-                    key={member.peerId}
-                    className="flex items-center justify-between rounded-xl border border-slate-100 bg-white/80 px-3 py-2"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">
-                        {member.name?.slice(0, 2)?.toUpperCase() || 'MX'}
-                      </div>
-                      <div>
-                        <div className="text-sm font-semibold text-slate-800">
-                          {member.name}{' '}
-                          {isSelf && <span className="text-xs text-slate-400">({t('members.you')})</span>}
-                        </div>
-                        <div className="text-xs text-slate-500">{t(`roles.${member.role}`)}</div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+        <div className="space-y-6">
+          <PanelCard title={t('status.roomJoined')} description={hostId ? t('status.hostAvailable') : t('status.waitingHost')}>
+            <div className="flex flex-wrap gap-2">
+              {statusBadges.map((badge) => (
+                <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />
+              ))}
+            </div>
+          </PanelCard>
+
+          <MemberList
+            title={t('members.title')}
+            description={hostId ? t('status.hostAvailable') : t('status.waitingHost')}
+            members={members}
+            emptyLabel={t('members.empty')}
+            selfPeerId={peerId}
+            getRoleLabel={(role) => (role === 'self' ? t('members.you') : t(`roles.${role}`))}
+          />
+
+          <LogPanel title={t('join.logTitle')} />
         </div>
       </div>
     </Layout>
