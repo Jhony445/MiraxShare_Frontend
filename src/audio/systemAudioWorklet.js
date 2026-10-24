@@ -5,6 +5,11 @@ class SystemAudioWorkletProcessor extends AudioWorkletProcessor {
     const processorOptions = options?.processorOptions || {};
     this.channels = processorOptions.channels || 2;
     this.maxQueueMs = processorOptions.maxQueueMs || 500;
+    // Jitter buffer: IPC chunks arrive unevenly, so play only once this much audio is queued.
+    // Without it the queue hovered at ~1 ms and every late chunk became an audible gap of silence.
+    this.prebufferFrames = Math.floor(((processorOptions.prebufferMs || 60) / 1000) * sampleRate);
+    this.buffering = true;
+    this.rebuffers = 0;
 
     this.queue = [];
     this.currentChunk = null;
@@ -31,6 +36,7 @@ class SystemAudioWorkletProcessor extends AudioWorkletProcessor {
   }
 
   flushQueue() {
+    this.buffering = true;
     this.queue = [];
     this.currentChunk = null;
     this.currentFrameOffset = 0;
@@ -97,13 +103,23 @@ class SystemAudioWorkletProcessor extends AudioWorkletProcessor {
   }
 
   nextFrame() {
+    if (this.buffering) {
+      if (this.queuedFrames < this.prebufferFrames) {
+        return [0, 0];
+      }
+      this.buffering = false;
+    }
+
     if (!this.currentChunk) {
       this.currentChunk = this.queue.shift() || null;
       this.currentFrameOffset = 0;
     }
 
     if (!this.currentChunk) {
+      // Ran dry: refill the cushion instead of clicking on every late chunk.
       this.framesUnderrun += 1;
+      this.rebuffers += 1;
+      this.buffering = true;
       return [0, 0];
     }
 
@@ -154,6 +170,7 @@ class SystemAudioWorkletProcessor extends AudioWorkletProcessor {
         framesRendered: this.framesRendered,
         framesUnderrun: this.framesUnderrun,
         framesDropped: this.framesDropped,
+        rebuffers: this.rebuffers,
       });
     }
 

@@ -17,6 +17,7 @@ export async function createElectronSystemAudioTrack({
   channels = 2,
   frameMs = 20,
   maxQueueMs = 500,
+  prebufferMs = 60,
   onStats,
 } = {}) {
   if (!window.electronAPI?.isElectron) {
@@ -41,6 +42,7 @@ export async function createElectronSystemAudioTrack({
     processorOptions: {
       channels,
       maxQueueMs,
+      prebufferMs,
     },
   });
 
@@ -52,6 +54,7 @@ export async function createElectronSystemAudioTrack({
     framesRendered: 0,
     framesUnderrun: 0,
     framesDropped: 0,
+    rebuffers: 0,
   };
 
   workletNode.port.onmessage = (event) => {
@@ -62,6 +65,7 @@ export async function createElectronSystemAudioTrack({
       framesRendered: data.framesRendered || 0,
       framesUnderrun: data.framesUnderrun || 0,
       framesDropped: data.framesDropped || 0,
+      rebuffers: data.rebuffers || 0,
     };
   };
 
