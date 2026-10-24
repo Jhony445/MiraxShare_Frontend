@@ -8,6 +8,7 @@ import {
   applyHighQualityAudioSender,
   optimizeOpusSdpForMusic,
   findSenderByKind,
+  preferHardwareVideoCodec,
   upsertTrackSender,
 } from '../lib/webrtc.js';
 import { QUALITY_OPTIONS, QUALITY_PRESETS, applySenderQuality } from '../lib/qualityPresets.js';
@@ -320,6 +321,7 @@ function Host() {
     if (videoTrack) {
       entry.videoSender = await upsertTrackSender(pc, stream, videoTrack);
       if (entry.videoSender) {
+        await preferHardwareVideoCodec(pc, entry.videoSender);
         await applySenderQuality(entry.videoSender, activePresetRef.current);
       }
     } else {

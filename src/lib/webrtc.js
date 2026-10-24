@@ -40,6 +40,38 @@ export function findSenderByKind(pc, kind) {
   return pc.getSenders().find((sender) => sender.track && sender.track.kind === kind) || null;
 }
 
+// AV1 only when the GPU encodes it (software AV1 is too heavy for live 1080p); otherwise H.264, which most GPUs encode.
+// Measured on an RTX 5060 in Electron: AV1 and H.264 run on the GPU, VP8 (browser default) on the CPU with the worst quality.
+let preferredVideoCodec = null;
+function detectPreferredVideoCodec() {
+  preferredVideoCodec ||= navigator.mediaCapabilities
+    .encodingInfo({
+      type: 'webrtc',
+      video: { contentType: 'video/AV1', width: 1920, height: 1080, bitrate: 12_000_000, framerate: 30 },
+    })
+    .then((info) => (info.powerEfficient ? 'video/AV1' : 'video/H264'))
+    .catch(() => 'video/H264');
+  return preferredVideoCodec;
+}
+
+// Only an order of preference: the viewer's answer still falls back to any codec both sides support.
+export async function preferHardwareVideoCodec(pc, sender) {
+  const transceiver = pc?.getTransceivers().find((item) => item.sender === sender);
+  if (!transceiver?.setCodecPreferences) return;
+
+  const order = [await detectPreferredVideoCodec(), 'video/H264'];
+  const rank = (codec) => {
+    const index = order.indexOf(codec.mimeType);
+    return index === -1 ? order.length : index;
+  };
+  const codecs = [...RTCRtpReceiver.getCapabilities('video').codecs].sort((a, b) => rank(a) - rank(b));
+  try {
+    transceiver.setCodecPreferences(codecs);
+  } catch (_err) {
+    // Keep the browser's default order.
+  }
+}
+
 export async function upsertTrackSender(pc, stream, track) {
   if (!pc || !stream || !track) return null;
 

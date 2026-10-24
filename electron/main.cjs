@@ -13,6 +13,9 @@ const {
 // ponytail: the window loads the deployed web app, so web changes ship without a new installer.
 // Only changes under electron/ or native/ need a rebuild of the .exe.
 const APP_URL = process.env.VITE_DEV_SERVER_URL || 'https://miraxshare.netlify.app';
+
+// Lets WebRTC encode AV1 on the GPU through Media Foundation (verified on RTX 50 series); off by default in Chromium 130.
+app.commandLine.appendSwitch('enable-features', 'MediaFoundationAV1Encoding');
 const APP_ORIGIN = new URL(APP_URL).origin;
 
 function isAppUrl(url) {
