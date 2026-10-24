@@ -3,4 +3,4 @@ export const WS_URL =
 
 export const WINDOWS_DOWNLOAD_URL =
   import.meta.env.VITE_WINDOWS_DOWNLOAD_URL ||
-  'https://drive.google.com/file/d/1IGooAnNa1A7SoRhmc9B_7yUgP9M7Z96f/view?usp=sharing';
+  'https://drive.google.com/file/d/1SR6Qlg0WFw2CU4SkmtErpDNsgLtua4cO/view?usp=sharing';
