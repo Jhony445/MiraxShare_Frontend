@@ -1,17 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import StatusBadge from '../components/StatusBadge.jsx';
-import LogPanel from '../components/LogPanel.jsx';
 import UsernameModal from '../components/UsernameModal.jsx';
-import {
-  AudioPulse,
-  FieldLabel,
-  InlineMessage,
-  MemberList,
-  MetricStrip,
-  PageHero,
-  PanelCard,
-} from '../components/StudioPrimitives.jsx';
+import { InlineMessage, MemberList, StatusDot } from '../components/StudioPrimitives.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
 import { createPeerConnection, closePeerConnection } from '../lib/webrtc.js';
 import { clearLog, logEvent } from '../lib/logger.js';
@@ -300,134 +290,65 @@ function AudioJoin() {
 
   const resolvedPcState = t(`pc.${pcState}`) === `pc.${pcState}` ? pcState : t(`pc.${pcState}`);
 
-  const heroMetrics = [
-    {
-      label: t('audioJoin.title'),
-      value: joined ? roomId : '--',
-      detail: joined ? t('status.roomJoined') : t('status.notJoined'),
-      tone: 'brand',
-    },
-    {
-      label: t('status.hostAvailable'),
-      value: hostId ? t('status.hostAvailable') : t('status.waitingHost'),
-      detail: joined ? t('status.roomJoined') : t('common.waiting'),
-      tone: hostId ? 'copper' : 'neutral',
-    },
-    {
-      label: t('status.pc', { state: '' }).trim(),
-      value: resolvedPcState,
-      detail: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
-      tone: pcState === 'connected' ? 'brand' : 'neutral',
-    },
-    {
-      label: t('audioJoin.volume'),
-      value: `${volume}%`,
-      detail: joined ? t('audioJoin.listenTitle') : t('common.waiting'),
-      tone: 'neutral',
-    },
-  ];
+  const status = !joined
+    ? { tone: 'off', label: t('status.notJoined') }
+    : !hostId
+      ? { tone: 'warn', label: t('status.waitingHost') }
+      : { tone: pcState === 'connected' ? 'ok' : 'warn', label: resolvedPcState };
 
-  const statusBadges = [
-    {
-      label: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
-      tone: wsStatus === 'open' ? 'ok' : 'warn',
-    },
-    {
-      label: joined ? t('status.roomJoined') : t('status.notJoined'),
-      tone: joined ? 'ok' : 'neutral',
-    },
-    {
-      label: hostId ? t('status.hostAvailable') : t('status.waitingHost'),
-      tone: hostId ? 'ok' : 'warn',
-    },
-    {
-      label: t('status.pc', { state: resolvedPcState }),
-      tone: pcState === 'connected' ? 'ok' : 'neutral',
-    },
-  ];
+  function handleSubmit(event) {
+    event.preventDefault();
+    if (joined) {
+      disconnectRoom();
+    } else {
+      joinRoom();
+    }
+  }
 
   return (
-    <Layout>
+    <Layout title={t('nav.audioJoin')}>
       <UsernameModal open={needsPrompt} onSave={persistUsername} />
-      <PageHero eyebrow={t('audioJoin.consoleLabel')} title={t('audioJoin.title')} description={t('audioJoin.hint')}>
-        <MetricStrip items={heroMetrics} className="xl:grid-cols-4" />
-      </PageHero>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.18fr_0.82fr]">
-        <div className="space-y-6">
-          <PanelCard
-            title={t('audioJoin.title')}
-            description={hostId ? t('status.hostAvailable') : t('status.waitingHost')}
-            actions={
-              <button type="button" onClick={joined ? disconnectRoom : joinRoom} className="mx-btn-primary text-xs">
-                {joined ? t('audioJoin.disconnect') : t('audioJoin.button')}
+      <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
+        <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="mx-card space-y-2">
+            <div className="flex gap-2">
+              <input
+                aria-label={t('host.roomTitle')}
+                className="font-mono uppercase tracking-widest placeholder:font-sans placeholder:normal-case placeholder:tracking-normal"
+                value={roomId}
+                onChange={(event) => setRoomId(event.target.value.toUpperCase())}
+                placeholder={t('join.placeholder')}
+                disabled={joined}
+              />
+              <button type="submit" className={`shrink-0 ${joined ? 'mx-btn-secondary' : 'mx-btn-primary'}`}>
+                {joined ? t('join.disconnect') : t('join.button')}
               </button>
-            }
-          >
-            <FieldLabel htmlFor="audio-join-room" label={t('audioHost.roomTitle')} aside={joined ? t('status.roomJoined') : t('status.notJoined')} />
-            <input
-              id="audio-join-room"
-              className="mx-input mx-code text-lg font-semibold tracking-[0.24em]"
-              value={roomId}
-              onChange={(event) => setRoomId(event.target.value.toUpperCase())}
-              placeholder={t('audioJoin.placeholder')}
-              disabled={joined}
-            />
+            </div>
+            <InlineMessage>{error}</InlineMessage>
+          </form>
 
-            {error ? <div className="mt-4"><InlineMessage tone="error">{error}</InlineMessage></div> : null}
-          </PanelCard>
-
-          <PanelCard tone="dark" title={t('audioJoin.listenTitle')} description={t('audioJoin.hint')}>
-            <div className="mx-stage-viewport mx-stage-audio px-6 py-8 sm:px-8">
-              <AudioPulse active={pcState === 'connected'} />
-
-              <div className="mt-5 rounded-[22px] border border-white/10 bg-white/6 p-4">
-                <audio ref={audioRef} autoPlay controls className="w-full" />
-              </div>
-
-              <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
-                <div>
-                  <div className="mx-field-label text-brand-100">{t('audioJoin.volume')}</div>
-                  <div className="mt-3 flex items-center gap-3">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={volume}
-                      onChange={(event) => setVolume(Number(event.target.value))}
-                      className="w-full accent-brand-600"
-                    />
-                    <div className="w-12 text-right text-sm font-semibold text-white">{volume}%</div>
-                  </div>
-                </div>
-                <div className="rounded-full border border-white/10 bg-white/6 px-4 py-2 text-xs uppercase tracking-[0.16em] text-white/70">
-                  {resolvedPcState}
-                </div>
+          <div className="mx-card space-y-4">
+            <audio ref={audioRef} autoPlay controls className="w-full" />
+            <div className="flex flex-wrap items-center gap-3">
+              <StatusDot tone={status.tone} label={status.label} />
+              <div className="ml-auto flex items-center gap-2">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={volume}
+                  onChange={(event) => setVolume(Number(event.target.value))}
+                  aria-label={t('join.volume')}
+                  className="w-32"
+                />
+                <span className="w-10 text-right text-xs text-fg-muted">{volume}%</span>
               </div>
             </div>
-          </PanelCard>
+            <p className="text-xs text-fg-muted">{t('audioJoin.hint')}</p>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          <PanelCard title={t('status.roomJoined')} description={hostId ? t('status.hostAvailable') : t('status.waitingHost')}>
-            <div className="flex flex-wrap gap-2">
-              {statusBadges.map((badge) => (
-                <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />
-              ))}
-            </div>
-          </PanelCard>
-
-          <MemberList
-            title={t('members.title')}
-            description={hostId ? t('status.hostAvailable') : t('status.waitingHost')}
-            members={members}
-            emptyLabel={t('members.empty')}
-            selfPeerId={peerId}
-            getRoleLabel={(role) => (role === 'self' ? t('members.you') : t(`roles.${role}`))}
-          />
-
-          <LogPanel title={t('audioJoin.logTitle')} />
-        </div>
+        <MemberList members={members} selfPeerId={peerId} />
       </div>
     </Layout>
   );

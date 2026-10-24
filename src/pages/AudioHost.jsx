@@ -1,17 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import StatusBadge from '../components/StatusBadge.jsx';
-import LogPanel from '../components/LogPanel.jsx';
 import UsernameModal from '../components/UsernameModal.jsx';
-import {
-  AudioPulse,
-  FieldLabel,
-  InlineMessage,
-  MemberList,
-  MetricStrip,
-  PageHero,
-  PanelCard,
-} from '../components/StudioPrimitives.jsx';
+import { InlineMessage, MemberList, RoomCode, StatusDot } from '../components/StudioPrimitives.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
 import {
   createPeerConnection,
@@ -432,140 +422,41 @@ function AudioHost() {
     updateCounts();
   }
 
-  function copyRoomId() {
-    navigator.clipboard.writeText(roomId).then(
-      () => logEvent(tRef.current('log.clipboard'), tRef.current('log.room', { roomId })),
-      () => setError(tRef.current('host.errorCopy'))
-    );
-  }
-
-  const heroMetrics = [
-    {
-      label: t('audioHost.roomTitle'),
-      value: roomId,
-      detail: joined ? t('status.roomJoined') : t('status.joining'),
-      tone: 'brand',
-    },
-    {
-      label: t('members.title'),
-      value: `${listenerCount}/${MAX_LISTENERS}`,
-      detail: t('status.connections', { count: connectedCount }),
-      tone: 'neutral',
-    },
-    {
-      label: t('audioStatus.sharing'),
-      value: isSharing ? t('audioStatus.sharing') : t('audioStatus.notSharing'),
-      detail: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
-      tone: isSharing ? 'copper' : 'neutral',
-    },
-    {
-      label: t('audioHost.consoleLabel'),
-      value: joined ? t('status.roomJoined') : t('status.joining'),
-      detail: null,
-      tone: 'neutral',
-    },
-  ];
-
-  const statusBadges = [
-    {
-      label: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
-      tone: wsStatus === 'open' ? 'ok' : 'warn',
-    },
-    {
-      label: joined ? t('status.roomJoined') : t('status.joining'),
-      tone: joined ? 'ok' : 'neutral',
-    },
-    {
-      label: t('audioStatus.listeners', { count: listenerCount, max: MAX_LISTENERS }),
-      tone: listenerCount > 0 ? 'ok' : 'warn',
-    },
-    {
-      label: isSharing ? t('audioStatus.sharing') : t('audioStatus.notSharing'),
-      tone: isSharing ? 'ok' : 'warn',
-    },
-    {
-      label: t('status.connections', { count: connectedCount }),
-      tone: connectedCount > 0 ? 'ok' : 'neutral',
-    },
-  ];
+  const status = !joined || wsStatus !== 'open'
+    ? { tone: 'warn', label: t('status.joining') }
+    : isSharing
+      ? { tone: 'live', label: t('status.sharing') }
+      : { tone: 'ok', label: t('status.roomJoined') };
 
   return (
-    <Layout>
+    <Layout title={t('nav.audioHost')}>
       <UsernameModal open={needsPrompt} onSave={persistUsername} />
-      <PageHero
-        eyebrow={t('audioHost.consoleLabel')}
-        title={t('audioHost.shareTitle')}
-        description={t('audioHost.tip')}
-        actions={
-          <>
-            <button type="button" onClick={startShare} className="mx-btn-primary">
-              {t('audioHost.startShare')}
-            </button>
-            <button type="button" onClick={stopShare} className="mx-btn-danger">
-              {t('audioHost.stopShare')}
-            </button>
-          </>
-        }
-      >
-        <MetricStrip items={heroMetrics} className="xl:grid-cols-4" />
-      </PageHero>
+      <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
+        <div className="mx-card h-fit space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <RoomCode code={roomId} />
+            <div className="flex flex-col items-end gap-1">
+              <StatusDot tone={status.tone} label={status.label} />
+              <span className="text-xs text-fg-muted">
+                {t('audioStatus.listeners', { count: listenerCount, max: MAX_LISTENERS })}
+              </span>
+            </div>
+          </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-6">
-          <PanelCard
-            title={t('audioHost.roomTitle')}
-            description={t('audioHost.tip')}
-            actions={
-              <button type="button" onClick={copyRoomId} className="mx-btn-secondary text-xs">
-                {t('host.copy')}
-              </button>
-            }
+          <button
+            type="button"
+            onClick={isSharing ? stopShare : startShare}
+            className={`w-full sm:w-auto ${isSharing ? 'mx-btn-danger' : 'mx-btn-primary'}`}
           >
-            <FieldLabel htmlFor="audio-host-room" label={t('audioHost.roomTitle')} aside={joined ? t('status.roomJoined') : t('status.joining')} />
-            <input id="audio-host-room" className="mx-input mx-code text-lg font-semibold tracking-[0.24em]" value={roomId} readOnly />
+            {isSharing ? t('audioHost.stopShare') : t('audioHost.startShare')}
+          </button>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {statusBadges.map((badge) => (
-                <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />
-              ))}
-            </div>
-
-            {notice ? <div className="mt-4"><InlineMessage tone="warn">{notice}</InlineMessage></div> : null}
-            {error ? <div className="mt-3"><InlineMessage tone="error">{error}</InlineMessage></div> : null}
-          </PanelCard>
-
-          <PanelCard tone="dark" title={t('audioHost.shareTitle')} description={t('audioHost.qualityNote')}>
-            <div className="mx-stage-viewport mx-stage-audio px-6 py-8 sm:px-8">
-              <AudioPulse active={isSharing} />
-              <div className="mt-5 rounded-[22px] border border-white/10 bg-white/6 p-4 text-center">
-                <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-200">
-                  {isSharing ? t('audioStatus.sharing') : t('audioStatus.notSharing')}
-                </div>
-                <p className="mt-3 text-sm leading-7 text-white/72">{t('audioHost.tip')}</p>
-              </div>
-            </div>
-          </PanelCard>
+          <p className="text-xs text-fg-muted">{t('audioHost.tip')}</p>
+          <InlineMessage tone="warn">{notice}</InlineMessage>
+          <InlineMessage>{error}</InlineMessage>
         </div>
 
-        <div className="space-y-6">
-          <PanelCard title={t('audioHost.consoleLabel')} description={t('audioHost.qualityNote')}>
-            <div className="space-y-4">
-              <InlineMessage tone="info">{t('audioHost.tip')}</InlineMessage>
-              <div className="mx-control-strip text-sm leading-7 text-white/64">{t('audioHost.qualityNote')}</div>
-            </div>
-          </PanelCard>
-
-          <MemberList
-            title={t('members.title')}
-            description={t('audioStatus.listeners', { count: listenerCount, max: MAX_LISTENERS })}
-            members={members}
-            emptyLabel={t('members.empty')}
-            selfPeerId={peerId}
-            getRoleLabel={(role) => (role === 'self' ? t('members.you') : t(`roles.${role}`))}
-          />
-
-          <LogPanel title={t('audioHost.logTitle')} />
-        </div>
+        <MemberList members={members} selfPeerId={peerId} />
       </div>
     </Layout>
   );

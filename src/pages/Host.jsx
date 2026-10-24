@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import StatusBadge from '../components/StatusBadge.jsx';
-import LogPanel from '../components/LogPanel.jsx';
-import {
-  FieldLabel,
-  InlineMessage,
-  MemberList,
-  MetricStrip,
-  PageHero,
-  PanelCard,
-} from '../components/StudioPrimitives.jsx';
+import { InlineMessage, MemberList, RoomCode, StatusDot } from '../components/StudioPrimitives.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
 import {
   createPeerConnection,
@@ -713,141 +704,35 @@ function Host() {
     await applyCaptureConstraints(activePreset);
   }
 
-  function copyRoomId() {
-    navigator.clipboard.writeText(roomId).then(
-      () => logEvent(t('log.clipboard'), t('log.room', { roomId })),
-      () => setError(t('host.errorCopy'))
-    );
-  }
-
-  const heroMetrics = [
-    {
-      label: t('host.roomTitle'),
-      value: roomId,
-      detail: joined ? t('status.roomJoined') : t('status.joining'),
-      tone: 'brand',
-    },
-    {
-      label: t('members.title'),
-      value: `${viewerCount}/${MAX_VIEWERS}`,
-      detail: t('status.connections', { count: connectedCount }),
-      tone: 'neutral',
-    },
-    {
-      label: t('status.sharing'),
-      value: isSharing ? t('status.sharing') : t('status.notSharing'),
-      detail: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
-      tone: isSharing ? 'copper' : 'neutral',
-    },
-    {
-      label: t('host.qualityLabel'),
-      value: QUALITY_PRESETS[quality]?.label || quality,
-      detail: null,
-      tone: 'neutral',
-    },
-  ];
-
-  const statusBadges = [
-    {
-      label: wsStatus === 'open' ? t('status.wsConnected') : t('status.wsDisconnected'),
-      tone: wsStatus === 'open' ? 'ok' : 'warn',
-    },
-    {
-      label: joined ? t('status.roomJoined') : t('status.joining'),
-      tone: joined ? 'ok' : 'neutral',
-    },
-    {
-      label: t('status.viewers', { count: viewerCount, max: MAX_VIEWERS }),
-      tone: viewerCount > 0 ? 'ok' : 'warn',
-    },
-    {
-      label: isSharing ? t('status.sharing') : t('status.notSharing'),
-      tone: isSharing ? 'ok' : 'warn',
-    },
-    {
-      label: t('status.connections', { count: connectedCount }),
-      tone: connectedCount > 0 ? 'ok' : 'neutral',
-    },
-  ];
+  const status = !joined || wsStatus !== 'open'
+    ? { tone: 'warn', label: t('status.joining') }
+    : isSharing
+      ? { tone: 'live', label: t('status.sharing') }
+      : { tone: 'ok', label: t('status.roomJoined') };
 
   return (
-    <Layout>
+    <Layout title={t('nav.host')}>
       <UsernameModal open={needsPrompt} onSave={persistUsername} />
-      <PageHero
-        eyebrow={t('host.consoleLabel')}
-        title={t('host.screenShareTitle')}
-        description={t('host.audioBestTip')}
-        actions={
-          <>
-            <button type="button" onClick={startShare} className="mx-btn-primary">
-              {t('host.startShare')}
-            </button>
-            <button type="button" onClick={stopShare} className="mx-btn-danger">
-              {t('host.stopShare')}
-            </button>
-          </>
-        }
-      >
-        <MetricStrip items={heroMetrics} className="xl:grid-cols-4" />
-      </PageHero>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.28fr_0.72fr]">
-        <div className="space-y-6">
-          <PanelCard
-            title={t('host.roomTitle')}
-            description={t('host.audioBestTip')}
-            actions={
-              <button type="button" onClick={copyRoomId} className="mx-btn-secondary text-xs">
-                {t('host.copy')}
-              </button>
-            }
-          >
-            <div className="grid gap-4 md:grid-cols-[1.1fr_0.9fr]">
-              <div>
-                <FieldLabel htmlFor="host-room-code" label={t('host.roomTitle')} aside={joined ? t('status.roomJoined') : t('status.joining')} />
-                <input id="host-room-code" className="mx-input mx-code text-lg font-semibold tracking-[0.24em]" value={roomId} readOnly />
-              </div>
-              <div className="mx-control-strip">
-                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-white/42">{t('status.wsConnected')}</div>
-                <div className="mt-2 text-sm leading-7 text-white/64">{t('host.audioTip')}</div>
+      <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
+        <div className="space-y-4">
+          <div className="mx-card space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <RoomCode code={roomId} />
+              <div className="flex flex-col items-end gap-1">
+                <StatusDot tone={status.tone} label={status.label} />
+                <span className="text-xs text-fg-muted">{t('status.viewers', { count: viewerCount, max: MAX_VIEWERS })}</span>
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {statusBadges.map((badge) => (
-                <StatusBadge key={badge.label} label={badge.label} tone={badge.tone} />
-              ))}
-            </div>
-
-            {notice ? <div className="mt-4"><InlineMessage tone="warn">{notice}</InlineMessage></div> : null}
-            {error ? <div className="mt-3"><InlineMessage tone="error">{error}</InlineMessage></div> : null}
-          </PanelCard>
-
-          <PanelCard tone="dark" title={t('host.previewTitle')} description={t('host.previewNote')}>
-            <div className="mx-stage-viewport mx-stage-screen aspect-video">
-              {!isSharing && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center p-6 text-center">
-                  <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-200">{t('status.notSharing')}</div>
-                    <div className="mt-3 font-display text-2xl tracking-[-0.03em] text-white">{t('host.startShare')}</div>
-                    <p className="mt-2 max-w-sm text-sm leading-7 text-white/68">{t('host.previewNote')}</p>
-                  </div>
-                </div>
-              )}
-              <video ref={videoRef} autoPlay muted playsInline className="relative z-0 h-full w-full object-cover" />
-            </div>
-          </PanelCard>
-        </div>
-
-        <div className="space-y-6">
-          <PanelCard title={t('host.screenShareTitle')} description={isElectronRuntime ? t('host.electronAudioEnabled') : t('host.audioBestTip')}>
-            <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <FieldLabel htmlFor="host-quality" label={t('host.qualityLabel')} />
-                <select id="host-quality" value={quality} onChange={handleQualityChange} className="mx-select text-sm text-white">
+                <label htmlFor="host-quality" className="mx-label">
+                  {t('host.qualityLabel')}
+                </label>
+                <select id="host-quality" value={quality} onChange={handleQualityChange}>
                   {QUALITY_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label} ({option.maxBitrateKbps} kbps)
+                      {option.label}
                     </option>
                   ))}
                 </select>
@@ -855,56 +740,63 @@ function Host() {
 
               {isElectronRuntime && (
                 <div>
-                  <FieldLabel
-                    htmlFor="host-capture-source"
-                    label={t('host.captureSourceLabel')}
-                    aside={
-                      <button
-                        type="button"
-                        onClick={loadCaptureSources}
-                        disabled={isLoadingSources}
-                        className="mx-btn-ghost px-3 py-1.5 text-[11px] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {isLoadingSources ? t('host.captureSourceLoading') : t('host.captureRefresh')}
-                      </button>
-                    }
-                  />
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="host-capture-source" className="mx-label">
+                      {t('host.captureSourceLabel')}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={loadCaptureSources}
+                      disabled={isLoadingSources}
+                      className="mb-1.5 text-xs text-fg-muted transition-colors hover:text-fg-strong disabled:opacity-50"
+                    >
+                      {isLoadingSources ? t('host.captureSourceLoading') : t('host.captureRefresh')}
+                    </button>
+                  </div>
                   <select
                     id="host-capture-source"
                     value={selectedSourceId}
                     onChange={(event) => setSelectedSourceId(event.target.value)}
                     disabled={isLoadingSources || captureSources.length === 0}
-                    className="mx-select text-sm text-white disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {captureSources.length === 0 ? (
                       <option value="">{t('host.captureSourceEmpty')}</option>
                     ) : (
                       captureSources.map((source) => (
                         <option key={source.id} value={source.id}>
-                          {source.kind === 'screen' ? 'Screen' : 'Window'} - {source.name}
+                          {source.name}
                         </option>
                       ))
                     )}
                   </select>
-                  <div className="mt-2 text-sm leading-7 text-white/64">{t('host.captureSourceHint')}</div>
                 </div>
               )}
-
-              {!isElectronRuntime && <InlineMessage tone="info">{t('host.audioTip')}</InlineMessage>}
             </div>
-          </PanelCard>
 
-          <MemberList
-            title={t('members.title')}
-            description={t('status.viewers', { count: viewerCount, max: MAX_VIEWERS })}
-            members={members}
-            emptyLabel={t('members.empty')}
-            selfPeerId={peerId}
-            getRoleLabel={(role) => (role === 'self' ? t('members.you') : t(`roles.${role}`))}
-          />
+            <button
+              type="button"
+              onClick={isSharing ? stopShare : startShare}
+              className={`w-full sm:w-auto ${isSharing ? 'mx-btn-danger' : 'mx-btn-primary'}`}
+            >
+              {isSharing ? t('host.stopShare') : t('host.startShare')}
+            </button>
 
-          <LogPanel title={t('host.logTitle')} />
+            {!isElectronRuntime && <p className="text-xs text-fg-muted">{t('host.audioTip')}</p>}
+            <InlineMessage tone="warn">{notice}</InlineMessage>
+            <InlineMessage>{error}</InlineMessage>
+          </div>
+
+          <div className="relative aspect-video overflow-hidden rounded-lg bg-surface-950">
+            {!isSharing && (
+              <div className="absolute inset-0 flex items-center justify-center text-sm text-fg-muted">
+                {t('host.previewEmpty')}
+              </div>
+            )}
+            <video ref={videoRef} autoPlay muted playsInline className="h-full w-full object-contain" />
+          </div>
         </div>
+
+        <MemberList members={members} selfPeerId={peerId} />
       </div>
     </Layout>
   );

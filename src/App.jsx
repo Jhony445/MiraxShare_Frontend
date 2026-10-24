@@ -9,15 +9,7 @@ const AudioJoin = lazy(() => import('./pages/AudioJoin.jsx'));
 
 function App() {
   return (
-    <Suspense
-      fallback={
-        <div className="mx-shell">
-          <main className="mx-container flex min-h-screen items-center justify-center py-16">
-            <div className="mx-panel px-6 py-4 text-sm text-white/68">Loading workspace...</div>
-          </main>
-        </div>
-      }
-    >
+    <Suspense fallback={null}>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/host" element={<Host />} />
