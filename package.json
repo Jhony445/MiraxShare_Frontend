@@ -12,7 +12,7 @@
     "build:web": "vite build",
     "build:native": "node scripts/build-native.cjs",
     "test:system-audio": "node scripts/test-system-audio.cjs",
-    "build:electron": "npm run build:native && npm run build:web && electron-builder --win nsis",
+    "build:electron": "npm run build:native && electron-builder --win nsis",
     "build:electron:release": "npm run build:electron && node scripts/copy-electron-artifacts.cjs",
     "preview": "vite preview"
   },
@@ -43,7 +43,6 @@
       "output": "release"
     },
     "files": [
-      "dist/**",
       "electron/**",
       "package.json"
     ],

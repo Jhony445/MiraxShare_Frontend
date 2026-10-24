@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import UsernameModal from '../components/UsernameModal.jsx';
 import { InlineMessage, MemberList, StatusDot } from '../components/StudioPrimitives.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
 import { createPeerConnection, closePeerConnection } from '../lib/webrtc.js';
@@ -8,6 +7,7 @@ import { clearLog, logEvent } from '../lib/logger.js';
 import { WS_URL } from '../lib/config.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useUsername } from '../lib/userProfile.js';
+import { playLeaveSound } from '../lib/sounds.js';
 
 function AudioJoin() {
   const [roomId, setRoomId] = useState('');
@@ -22,7 +22,7 @@ function AudioJoin() {
 
   const { t } = useI18n();
   const tRef = useRef(t);
-  const { username, needsPrompt, persistUsername } = useUsername();
+  const { username } = useUsername();
 
   const clientRef = useRef(null);
   const pcRef = useRef(null);
@@ -108,9 +108,12 @@ function AudioJoin() {
     });
 
     const offPeerLeft = client.on('peer-left', ({ peerId: id }) => {
+      playLeaveSound();
       if (hostRef.current === id) {
-        cleanupPeerConnection();
-        setHostId(null);
+        // ponytail: no host means no stream, so the viewer goes back to the code input.
+        disconnectRoom();
+        setError(tRef.current('join.hostLeft'));
+        return;
       }
       removeMember(id);
     });
@@ -306,8 +309,7 @@ function AudioJoin() {
   }
 
   return (
-    <Layout title={t('nav.audioJoin')}>
-      <UsernameModal open={needsPrompt} onSave={persistUsername} />
+    <Layout title={t('nav.audioJoin')} requireName>
       <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
         <div className="space-y-4">
           <form onSubmit={handleSubmit} className="mx-card space-y-2">

@@ -11,7 +11,7 @@ export const QUALITY_PRESETS = {
     label: '1080p 30fps',
     targetWidth: 1920,
     targetHeight: 1080,
-    maxBitrateKbps: 5000,
+    maxBitrateKbps: 12000,
     maxFramerate: 30,
     scaleResolutionDownBy: 1,
   },

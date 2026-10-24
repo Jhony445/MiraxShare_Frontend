@@ -6,8 +6,38 @@ const {
   ipcMain,
   desktopCapturer,
   session,
+  shell,
   webContents,
 } = require('electron');
+
+// ponytail: the window loads the deployed web app, so web changes ship without a new installer.
+// Only changes under electron/ or native/ need a rebuild of the .exe.
+const APP_URL = process.env.VITE_DEV_SERVER_URL || 'https://miraxshare.netlify.app';
+const APP_ORIGIN = new URL(APP_URL).origin;
+
+function isAppUrl(url) {
+  try {
+    return new URL(url).origin === APP_ORIGIN;
+  } catch (_err) {
+    return false;
+  }
+}
+
+function openExternal(url) {
+  if (/^https?:\/\//i.test(url)) {
+    void shell.openExternal(url);
+  }
+}
+
+function offlinePageUrl() {
+  const html = `<!doctype html><meta charset="utf-8"><title>MiraxShare</title>
+<body style="margin:0;height:100vh;display:grid;place-items:center;background:#313338;color:#dbdee1;font-family:system-ui,sans-serif">
+<div style="text-align:center">
+<p>Sin conexión · No connection</p>
+<button onclick="location.href='${APP_URL}'" style="border:0;border-radius:6px;padding:8px 16px;background:#5865f2;color:#fff;font:inherit;cursor:pointer">Reintentar · Retry</button>
+</div>`;
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
 
 const systemAudioState = {
   addon: null,
@@ -172,29 +202,36 @@ function createMainWindow() {
   });
   const wcId = win.webContents.id;
 
-  const devServerUrl = process.env.VITE_DEV_SERVER_URL;
-  if (devServerUrl) {
-    win.loadURL(devServerUrl);
-    win.webContents.openDevTools({ mode: 'detach' });
-    win.on('closed', () => {
-      unregisterSystemAudioSubscriber(wcId);
-    });
-    return;
-  }
+  // The preload exposes native APIs, so the window never leaves the app origin; other links open in the browser.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    openExternal(url);
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (event, url) => {
+    if (isAppUrl(url)) return;
+    event.preventDefault();
+    openExternal(url);
+  });
+  win.webContents.on('did-fail-load', (_event, errorCode, _description, _url, isMainFrame) => {
+    // -3 is ERR_ABORTED: a navigation replaced by another one, not a real failure.
+    if (!isMainFrame || errorCode === -3) return;
+    win.loadURL(offlinePageUrl());
+  });
 
-  win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  win.loadURL(APP_URL);
+  if (process.env.VITE_DEV_SERVER_URL) {
+    win.webContents.openDevTools({ mode: 'detach' });
+  }
   win.on('closed', () => {
     unregisterSystemAudioSubscriber(wcId);
   });
 }
 
 function setupPermissions() {
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
-    if (permission === 'media' || permission === 'display-capture') {
-      callback(true);
-      return;
-    }
-    callback(false);
+  const allowedPermissions = new Set(['media', 'display-capture', 'fullscreen']);
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
+    const requestingUrl = details?.requestingUrl || wc.getURL();
+    callback(allowedPermissions.has(permission) && isAppUrl(requestingUrl));
   });
 
   if (typeof session.defaultSession.setDisplayMediaRequestHandler === 'function') {

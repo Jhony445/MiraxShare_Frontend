@@ -10,8 +10,14 @@ export class SignalingClient {
   connect() {
     if (this.ws) return;
     this.shouldReconnect = true;
+    window.addEventListener('pagehide', this.leave);
     this.openSocket();
   }
+
+  // Tell the server right away; the socket close alone can take up to a heartbeat (~30s) to reach other peers.
+  leave = () => {
+    this.send('leave');
+  };
 
   openSocket() {
     const ws = new WebSocket(this.url);
@@ -82,6 +88,8 @@ export class SignalingClient {
 
   close() {
     this.shouldReconnect = false;
+    window.removeEventListener('pagehide', this.leave);
+    this.leave();
     if (this.ws) {
       this.ws.close();
       this.ws = null;

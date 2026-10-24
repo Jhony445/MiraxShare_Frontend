@@ -15,7 +15,7 @@ import { clearLog, logEvent } from '../lib/logger.js';
 import { WS_URL } from '../lib/config.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useUsername } from '../lib/userProfile.js';
-import UsernameModal from '../components/UsernameModal.jsx';
+import { playLeaveSound } from '../lib/sounds.js';
 import { createElectronSystemAudioTrack } from '../lib/systemAudioElectron.js';
 
 function createRoomId() {
@@ -51,7 +51,7 @@ function Host() {
   const [isLoadingSources, setIsLoadingSources] = useState(false);
   const { t } = useI18n();
   const tRef = useRef(t);
-  const { username, needsPrompt, persistUsername } = useUsername();
+  const { username } = useUsername();
 
   const clientRef = useRef(null);
   const streamRef = useRef(null);
@@ -90,6 +90,13 @@ function Host() {
     logEvent(tRef.current('log.join'), tRef.current('log.room', { roomId }));
     upsertMember(peerId, { name: username, role: 'host' });
   }, [peerId, username, joined, roomId]);
+
+  // Rename from the header while the room is open.
+  useEffect(() => {
+    if (!joined || !peerId || !username) return;
+    upsertMember(peerId, { name: username, role: 'host' });
+    broadcastRoster();
+  }, [username]);
 
   useEffect(() => {
     clearLog();
@@ -151,6 +158,7 @@ function Host() {
 
     const offPeerLeft = client.on('peer-left', ({ peerId: id }) => {
       logEvent(tRef.current('log.peerLeft'), tRef.current('log.peerId', { id }));
+      playLeaveSound();
       removeViewer(id);
       removeMember(id);
       broadcastRoster();
@@ -711,8 +719,7 @@ function Host() {
       : { tone: 'ok', label: t('status.roomJoined') };
 
   return (
-    <Layout title={t('nav.host')}>
-      <UsernameModal open={needsPrompt} onSave={persistUsername} />
+    <Layout title={t('nav.host')} requireName>
       <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
         <div className="space-y-4">
           <div className="mx-card space-y-4">

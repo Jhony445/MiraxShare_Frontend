@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import Layout from '../components/Layout.jsx';
-import UsernameModal from '../components/UsernameModal.jsx';
 import { InlineMessage, MemberList, RoomCode, StatusDot } from '../components/StudioPrimitives.jsx';
 import { SignalingClient } from '../lib/signalingClient.js';
 import {
@@ -15,6 +14,7 @@ import { clearLog, logEvent } from '../lib/logger.js';
 import { WS_URL } from '../lib/config.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useUsername } from '../lib/userProfile.js';
+import { playLeaveSound } from '../lib/sounds.js';
 
 const MAX_LISTENERS = 6;
 const SYSTEM_AUDIO_BITRATE_KBPS = 256;
@@ -43,7 +43,7 @@ function AudioHost() {
 
   const { t } = useI18n();
   const tRef = useRef(t);
-  const { username, needsPrompt, persistUsername } = useUsername();
+  const { username } = useUsername();
 
   const clientRef = useRef(null);
   const streamRef = useRef(null);
@@ -62,6 +62,13 @@ function AudioHost() {
     logEvent(tRef.current('log.join'), tRef.current('log.room', { roomId }));
     upsertMember(peerId, { name: username, role: 'host' });
   }, [peerId, username, joined, roomId]);
+
+  // Rename from the header while the room is open.
+  useEffect(() => {
+    if (!joined || !peerId || !username) return;
+    upsertMember(peerId, { name: username, role: 'host' });
+    broadcastRoster();
+  }, [username]);
 
   useEffect(() => {
     clearLog();
@@ -109,6 +116,7 @@ function AudioHost() {
     });
 
     const offPeerLeft = client.on('peer-left', ({ peerId: id }) => {
+      playLeaveSound();
       removeViewer(id);
       removeMember(id);
       broadcastRoster();
@@ -429,8 +437,7 @@ function AudioHost() {
       : { tone: 'ok', label: t('status.roomJoined') };
 
   return (
-    <Layout title={t('nav.audioHost')}>
-      <UsernameModal open={needsPrompt} onSave={persistUsername} />
+    <Layout title={t('nav.audioHost')} requireName>
       <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
         <div className="mx-card h-fit space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-4">
