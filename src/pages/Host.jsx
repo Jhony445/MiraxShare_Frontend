@@ -15,7 +15,7 @@ import { clearLog, logEvent } from '../lib/logger.js';
 import { WS_URL } from '../lib/config.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useUsername } from '../lib/userProfile.js';
-import { playLeaveSound } from '../lib/sounds.js';
+import { playJoinSound, playLeaveSound } from '../lib/sounds.js';
 import { createElectronSystemAudioTrack } from '../lib/systemAudioElectron.js';
 
 function createRoomId() {
@@ -142,6 +142,7 @@ function Host() {
     });
 
     const offPeerJoined = client.on('peer-joined', ({ peerId: id, role }) => {
+      playJoinSound();
       const roleLabel = tRef.current(`roles.${role}`);
       logEvent(
         tRef.current('log.peerJoined'),

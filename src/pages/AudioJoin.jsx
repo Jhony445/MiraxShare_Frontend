@@ -7,7 +7,7 @@ import { clearLog, logEvent } from '../lib/logger.js';
 import { WS_URL } from '../lib/config.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useUsername } from '../lib/userProfile.js';
-import { playLeaveSound } from '../lib/sounds.js';
+import { playJoinSound, playLeaveSound } from '../lib/sounds.js';
 
 function AudioJoin() {
   const [roomId, setRoomId] = useState('');
@@ -100,6 +100,7 @@ function AudioJoin() {
     });
 
     const offPeerJoined = client.on('peer-joined', ({ peerId: id, role }) => {
+      playJoinSound();
       if (role === 'host') {
         setHostId(id);
         ensurePeerConnection(id);

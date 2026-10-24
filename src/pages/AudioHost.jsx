@@ -14,7 +14,7 @@ import { clearLog, logEvent } from '../lib/logger.js';
 import { WS_URL } from '../lib/config.js';
 import { useI18n } from '../lib/i18n.jsx';
 import { useUsername } from '../lib/userProfile.js';
-import { playLeaveSound } from '../lib/sounds.js';
+import { playJoinSound, playLeaveSound } from '../lib/sounds.js';
 
 const MAX_LISTENERS = 6;
 const SYSTEM_AUDIO_BITRATE_KBPS = 256;
@@ -107,6 +107,7 @@ function AudioHost() {
     });
 
     const offPeerJoined = client.on('peer-joined', ({ peerId: id, role }) => {
+      playJoinSound();
       if (role !== 'viewer') return;
       const accepted = registerViewer(id, { autoOffer: Boolean(streamRef.current) });
       if (accepted) {
